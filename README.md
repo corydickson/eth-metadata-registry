@@ -2,6 +2,8 @@
 
 Just like it sounds! Use your deployment keys to link metadata stored on IPFS to your contracts.
 
+Live on mainnet @ 0xb0a93fa2a87b3abf1f2cdf9dc2a266dc6bf30482
+
 ## Overview
 
 This registry allows deployment keys to submit an IPFS [multihash](https://github.com/multiformats/multihash) containing metadata (in any format the
