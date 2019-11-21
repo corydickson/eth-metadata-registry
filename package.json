@@ -1,0 +1,37 @@
+{
+  "name": "eth-metadata-registry",
+  "version": "0.0.1",
+  "description": "An on-chain metadata registry for ethereum smart contracts",
+  "main": "src/multihash.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "truffle test",
+    "lint:sol": "solium -d .",
+    "lint:sol:fix": "solium -d . --fix"
+  },
+  "keywords": [
+    "multihash",
+    "ipfs",
+    "solidity",
+    "registry"
+  ],
+  "author": "Cory Dickson<cory.dickson@protonmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "bignumber.js": "^9.0.0",
+    "bs58": "^4.0.1"
+  },
+  "devDependencies": {
+    "babel-cli": "^6.26.0",
+    "babel-polyfill": "^6.26.0",
+    "babel-preset-env": "^1.6.1",
+    "babel-register": "^6.26.0",
+    "chai": "^4.1.2",
+    "eslint": "^6.5.1",
+    "eslint-plugin-import": "^2.8.0",
+    "solium": "^1.1.5",
+    "truffle": "^4.0.6"
+  }
+}
