@@ -89,6 +89,20 @@ contract('MetadataRegistry', (accounts) => {
         await assertRevert(setInitialIPFSHash(registry.address, accounts[1], ipfsHashes[0]));
       });
 
+      it('should revert if msg.sender is not a delegate (deployer) after its been initialized', async () => {
+        await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
+        await assertRevert(setInitialIPFSHash(registry.address, accounts[1], ipfsHashes[1]));
+
+        const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
+
+        await assertRevert(
+          registry.methods['setEntry(address,bytes32,uint8,uint8)'](
+            registry.address, digest, hashFunction, size, { from: accounts[1] }
+          )
+        );
+        expect(await getIPFSHash(registry.address)).to.equal(ipfsHashes[0]);
+      });
+
       it('should revert if not initialized by a nonce', async () => {
         const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
         await assertRevert(

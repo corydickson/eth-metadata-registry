@@ -73,10 +73,8 @@ contract MetadataRegistry {
   public
   onlyContracts(_contract)
   {
-    if (entries[_contract].delegate == address(0)) {
-      require(isDeployer(msg.sender, _contract, _nonce), "Error: msg.sender is not contract deployer");
-    }
-
+    require(entries[_contract].delegate == address(0), "Error: contract entry has already been initialized");
+    require(isDeployer(msg.sender, _contract, _nonce), "Error: msg.sender is not contract deployer");
     _setEntry(_contract, _digest, _hashFunction, _size);
   }
 
