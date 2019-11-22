@@ -56,12 +56,12 @@ contract MetadataRegistry {
   }
 
   /**
-   * @dev associate a multihash with a contract if a delegate or deployer sends a tx
+   * @dev Initialize association of a multihash with a contract if the deployer sends a tx
    * @param _contract address of the associated contract
    * @param _digest hash digest produced by hashing content using hash function
    * @param _hashFunction hashFunction code for the hash function used
    * @param _size length of the digest
-   * @param _nonce number of tx of deployment key, value ignored after first entry;
+   * @param _nonce number of tx of deployment key;
    */
   function setEntry(
     address _contract,
@@ -77,6 +77,14 @@ contract MetadataRegistry {
     require(isDeployer(msg.sender, _contract, _nonce), "Error: msg.sender is not contract deployer");
     _setEntry(_contract, _digest, _hashFunction, _size);
   }
+
+  /**
+   * @dev associate a multihash with a contract if sender has delegate permissions
+   * @param _contract address of the associated contract
+   * @param _digest hash digest produced by hashing content using hash function
+   * @param _hashFunction hashFunction code for the hash function used
+   * @param _size length of the digest
+   */
 
   function setEntry(
     address _contract,
