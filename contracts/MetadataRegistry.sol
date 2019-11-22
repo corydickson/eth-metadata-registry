@@ -41,7 +41,13 @@ contract MetadataRegistry {
     uint latest
   );
 
-  event SetDelegate(address indexed key, address indexed delegate);
+  event SetDelegate(address indexed contractAddress, address indexed delegate);
+
+  modifier onlyDelegate(address _contract) {
+    require(entries[_contract].delegate != address(0), "Error: delegate cannot be empty");
+    require(msg.sender == entries[_contract].delegate, "Error: msg.sender is not a delegate");
+    _;
+  }
 
   /**
    * @dev associate a multihash with a contract if a delegate or deployer sends a tx
@@ -93,9 +99,9 @@ contract MetadataRegistry {
   */
   function clearEntry(address _contract)
   public
+  onlyDelegate(_contract)
   {
     require(entries[_contract].digest != 0, "Error: missing entry");
-    require(entries[_contract].delegate == msg.sender, "Error: msg.sender is not a delegate");
     delete entries[_contract];
 
     versions[_contract] -= 1;
@@ -108,12 +114,9 @@ contract MetadataRegistry {
   */
   function setDelegate(address _contract, address _delegate)
   public
+  onlyDelegate(_contract)
   {
-    // checks if sender is current delegate, if true then update delgate
-    require(entries[_contract].delegate != address(0), "Error: delegate cannot be empty");
-    require(entries[_contract].delegate == msg.sender, "Error: msg.sender is not a delegate");
     entries[_contract].delegate = _delegate;
-
     emit SetDelegate(_contract, _delegate);
   }
 
