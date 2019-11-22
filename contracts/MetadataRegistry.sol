@@ -18,14 +18,14 @@ pragma solidity >=0.4.18 < 0.6.0;
 
 
 contract MetadataRegistry {
-  struct Multihash {
+  struct Entry {
     address delegate;
     bytes32 digest;
     uint8 hashFunction;
     uint8 size;
   }
 
-  mapping (address => Multihash) private entries;
+  mapping (address => Entry) private entries;
   mapping (address => uint) private versions;
 
   event EntrySet (
@@ -68,7 +68,7 @@ contract MetadataRegistry {
       require(msg.sender == entries[_contract].delegate, "Error: msg.sender is not a delegate");
     }
 
-    Multihash memory entry = Multihash(
+    Entry memory entry = Entry(
       msg.sender,
       _digest,
       _hashFunction,
@@ -126,7 +126,7 @@ contract MetadataRegistry {
   view
   returns(bytes32 digest, uint8 hashfunction, uint8 size)
   {
-    Multihash storage entry = entries[_address];
+    Entry storage entry = entries[_address];
     return (entry.digest, entry.hashFunction, entry.size);
   }
 
@@ -139,7 +139,7 @@ contract MetadataRegistry {
   view
   returns(address delegate)
   {
-    Multihash storage entry = entries[_address];
+    Entry storage entry = entries[_address];
     return (entry.delegate);
   }
 
