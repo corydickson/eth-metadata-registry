@@ -1,4 +1,5 @@
-pragma solidity >=0.4.18 < 0.6.0;
+pragma solidity >=0.4.22< 0.6.0;
+pragma experimental ABIEncoderV2;
 
 /**
  * @title MetadataRegistry
@@ -49,6 +50,11 @@ contract MetadataRegistry {
     _;
   }
 
+  modifier onlyContracts(address _contract) {
+    require(isContract(_contract), "Error: address provided is not a contract");
+    _;
+  }
+
   /**
    * @dev associate a multihash with a contract if a delegate or deployer sends a tx
    * @param _contract address of the associated contract
@@ -65,32 +71,26 @@ contract MetadataRegistry {
     uint _nonce
   )
   public
+  onlyContracts(_contract)
   {
-    require(isContract(_contract), "Error: address provided is not a contract");
     if (entries[_contract].delegate == address(0)) {
-      // checks to ensure delegate is posting the update
       require(isDeployer(msg.sender, _contract, _nonce), "Error: msg.sender is not contract deployer");
-    } else {
-      require(msg.sender == entries[_contract].delegate, "Error: msg.sender is not a delegate");
     }
 
-    Entry memory entry = Entry(
-      msg.sender,
-      _digest,
-      _hashFunction,
-      _size
-    );
+    _setEntry(_contract, _digest, _hashFunction, _size);
+  }
 
-    entries[_contract] = entry;
-    versions[_contract] += 1;
-
-    emit EntrySet(
-      _contract,
-      msg.sender,
-      _digest,
-      _hashFunction,
-      _size
-    );
+  function setEntry(
+    address _contract,
+    bytes32 _digest,
+    uint8 _hashFunction,
+    uint8 _size
+  )
+  public
+  onlyDelegate(_contract)
+  onlyContracts(_contract)
+  {
+    _setEntry(_contract, _digest, _hashFunction, _size);
   }
 
   /**
@@ -127,7 +127,7 @@ contract MetadataRegistry {
   function getIPFSMultihash(address _address)
   public
   view
-  returns(bytes32 digest, uint8 hashfunction, uint8 size)
+  returns(bytes32 digest, uint8 hashFunction, uint8 size)
   {
     Entry storage entry = entries[_address];
     return (entry.digest, entry.hashFunction, entry.size);
@@ -153,10 +153,37 @@ contract MetadataRegistry {
   function getVersion(address _address)
   public
   view
-  returns(uint latest)
+  returns(uint)
   {
     uint version = versions[_address];
     return version;
+  }
+
+  function _setEntry(
+    address _contract,
+    bytes32 _digest,
+    uint8 _hashFunction,
+    uint8 _size
+  )
+  private
+  {
+    Entry memory entry = Entry(
+      msg.sender,
+      _digest,
+      _hashFunction,
+      _size
+    );
+
+    entries[_contract] = entry;
+    versions[_contract] += 1;
+
+    emit EntrySet(
+      _contract,
+      msg.sender,
+      _digest,
+      _hashFunction,
+      _size
+    );
   }
 
   function isContract(address _addr) private returns (bool valid) {

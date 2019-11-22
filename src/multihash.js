@@ -52,7 +52,7 @@ export function getMultihashFromBytes32(multihash) {
  * @returns {Multihash} multihash object
  */
 export function parseContractResponse(response) {
-  const [digest, hashFunction, size] = response;
+  const { digest, hashFunction, size } = response;
   return {
     digest,
     hashFunction: hashFunction.toNumber(),
