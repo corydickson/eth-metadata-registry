@@ -7,6 +7,12 @@ import expectEvent from './helpers/expectEvent';
 
 const MetadataRegistry = artifacts.require('./MetadataRegistry.sol');
 const NULL_ADDRESS = '0x0000000000000000000000000000000000000000';
+const DEFAULT_GAS_PRICE = 1e11; // 100 Shannon
+
+const SET_ENTRY_INITIAL = 'setEntry(address,bytes32,uint8,uint8,uint256)';
+const SET_ENTRY = 'setEntry(address,bytes32,uint8,uint8)';
+const SET_DELEGATE = 'setDelegate(address,address)';
+const CLEAR_ENTRY = 'clearEntry(address)';
 
 contract('MetadataRegistry', (accounts) => {
   let registry;
@@ -20,11 +26,26 @@ contract('MetadataRegistry', (accounts) => {
     'Qmb4atcgbbN5v4CDJ8nz5QG5L2pgwSTLd3raDrnyhLjnUH',
   ];
 
+  async function calculateGas(account, method, params) {
+    return registry.methods[method].estimateGas(
+      ...params, { from: account }
+    ).then(res => {
+      return Number(res);
+    });
+  }
+
+  async function getGasPrice() {
+    return web3.eth.getGasPrice( (err, res) => {
+      let gasPrice = Number(res);
+      return gasPrice;
+    });
+  }
+
   async function setInitialIPFSHash(contractAddr, account, hash) {
     const { digest, hashFunction, size } = getBytes32FromMultihash(hash);
     let nonce = await web3.eth.getTransactionCount(account) - 1; // the nonce before the contract was deployed
 
-    return registry.methods['setEntry(address,bytes32,uint8,uint8,uint256)'](
+    return registry.methods[SET_ENTRY_INITIAL](
       contractAddr, digest, hashFunction, size, nonce, { from: account }
     );
   }
@@ -73,7 +94,7 @@ contract('MetadataRegistry', (accounts) => {
 
         const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
 
-        await registry.methods['setEntry(address,bytes32,uint8,uint8)'](
+        await registry.methods[SET_ENTRY](
           registry.address, digest, hashFunction, size, { from: accounts[0] }
         );
         expect(await getVersion(registry.address)).to.equal(2);
@@ -96,7 +117,7 @@ contract('MetadataRegistry', (accounts) => {
         const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
 
         await assertRevert(
-          registry.methods['setEntry(address,bytes32,uint8,uint8)'](
+          registry.methods[SET_ENTRY](
             registry.address, digest, hashFunction, size, { from: accounts[1] }
           )
         );
@@ -106,7 +127,7 @@ contract('MetadataRegistry', (accounts) => {
       it('should revert if not initialized by a nonce', async () => {
         const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
         await assertRevert(
-          registry.methods['setEntry(address,bytes32,uint8,uint8)'](
+          registry.methods[SET_ENTRY](
             registry.address, digest, hashFunction, size, { from: accounts[0] }
           )
         );
@@ -176,4 +197,60 @@ contract('MetadataRegistry', (accounts) => {
       });
     });
   });
+
+  context('Estimate gas cost:', () => {
+    it('should calculate the gas', async () => {
+      let gasSetEntryInitial, gasSetEntry, gasClearEntry, gasSetDelegate;
+      const {digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[0]);
+      const nonce = await web3.eth.getTransactionCount(accounts[0]) - 1;
+      const gasPrice = await getGasPrice();
+
+      const formatPrice = async (gas, gasPrice) => {
+        const total = (gas * gasPrice);
+        return { inWei: total, inEth: await web3.utils.fromWei(total.toString(), 'ether') };
+      }
+
+      gasSetEntryInitial = await formatPrice(
+        await calculateGas(accounts[0], SET_ENTRY_INITIAL, [registry.address, digest, hashFunction, size, nonce]),
+        gasPrice
+      );
+
+      // We need to initialized the entry to prevent reverts on subsequent calls
+      await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
+
+      gasSetEntry = await formatPrice(
+        await calculateGas(accounts[0], SET_ENTRY, [registry.address, digest, hashFunction, size]),
+        gasPrice
+      );
+
+      gasClearEntry = await formatPrice(
+        await calculateGas(accounts[0], CLEAR_ENTRY, [registry.address]),
+        gasPrice
+      );
+
+      gasSetDelegate = await formatPrice(
+        await calculateGas(accounts[0], SET_DELEGATE, [registry.address, accounts[1]]),
+        gasPrice
+      );
+
+      // assert gas has been calculated
+      expect(gasSetEntryInitial).to.not.equal(undefined);
+      expect(gasSetEntry).to.not.equal(undefined);
+      expect(gasSetDelegate).to.not.equal(undefined);
+      expect(gasClearEntry).to.not.equal(undefined);
+
+      console.log("         Initializing with setEntry and nonce:");
+      console.log("             " + gasSetEntryInitial.inWei + " wei");
+      console.log("             " + gasSetEntryInitial.inEth + " ether");
+      console.log("         Updating existing using setEntry:");
+      console.log("             " + gasSetEntry.inWei + " wei");
+      console.log("             " + gasSetEntry.inEth + " ether");
+      console.log("         Creating a new delegate with setDelegate:");
+      console.log("             " + gasSetDelegate.inWei + " wei");
+      console.log("             " + gasSetDelegate.inEth + " ether");
+      console.log("         Clear an existing entry with clearEntry:");
+      console.log("             " + gasClearEntry.inWei + " wei");
+      console.log("             " + gasClearEntry.inEth + " ether");
+    });
+  })
 });

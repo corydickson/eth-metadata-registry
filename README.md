@@ -1,3 +1,4 @@
+[![Build Status](https://travis-ci.org/gh1dra/eth-metadata-registry.svg?branch=master)](https://travis-ci.org/gh1dra/eth-metadata-registry)
 # On-chain IPFS Metadata Registry
 
 Just like it sounds! Use your deployment keys to link metadata stored on IPFS to your contracts.
@@ -15,10 +16,20 @@ publishing ability for that given contract (including the deployment key).
 
 ## Implementation
 
-IPFS hash is often represented using 46 character long Base58 encoding(e.g. `QmahqCsAUAw7zMv6P6Ae8PjCTck7taQA6FgGQLnWdKG7U8`). We use the approach
-layed out [here](https://github.com/saurfang/ipfs-multihash-on-solidity) to make storing hashes less expensive. Furthermore, `setEntry` relies on
-the nonce of the deployment key for the first transaction only. This parameter becomes negligable for all subsequent calls since the deployment check
-happens only once, then relying on the delegate role for all further permissions.
+IPFS hash is often represented using 46 character long Base58 encoding(e.g. `QmahqCsAUAw7zMv6P6Ae8PjCTck7taQA6FgGQLnWdKG7U8`).
+We use the approach layed out [here](https://github.com/saurfang/ipfs-multihash-on-solidity) to make storing hashes less expensive.
+Furthermore, we have two overloaded instances of `setEntry`, one of which is only used for initialization; requiring the nonce of the
+deployment key as the last parameter. All updates to the registry can rely on the other method signature: `setEntry(address,bytes32,uint8,uint8)`
+that *does not* require the nonce.
+
+## Gas Estimates
+
+| Method | gas (wei) | gas (ether) |
+--- | --- | ---
+setEntry (nonce) | 234592000000000 | 0.000234592
+setEntry (update) | 113896000000000 | 0.000113896
+setDelegate | 64582000000000 | 0.000064582
+clearEntry | 172312000000000 | 0.000172312
 
 ## Install
 
