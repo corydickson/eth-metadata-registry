@@ -2,6 +2,10 @@
   "name": "eth-metadata-registry",
   "version": "0.0.1",
   "description": "An on-chain metadata registry for ethereum smart contracts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gh1dra/eth-metadata-registry"
+  },
   "main": "src/multihash.js",
   "directories": {
     "test": "test"
