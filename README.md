@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/gh1dra/eth-metadata-registry.svg?branch=master)](https://travis-ci.org/gh1dra/eth-metadata-registry)
+[![Build Status](https://travis-ci.com/gh1dra/eth-metadata-registry.svg?branch=master)](https://travis-ci.com/gh1dra/eth-metadata-registry)
 # On-chain IPFS Metadata Registry
 
 Just like it sounds! Use your deployment keys to link metadata stored on IPFS to your contracts.
@@ -23,6 +23,8 @@ deployment key as the last parameter. All updates to the registry can rely on th
 that *does not* require the nonce.
 
 ## Gas Estimates
+
+Gas price @ 2000000000 gwei
 
 | Method | gas (wei) | gas (ether) |
 --- | --- | ---

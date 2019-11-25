@@ -98,6 +98,7 @@ contract('MetadataRegistry', (accounts) => {
           registry.address, digest, hashFunction, size, { from: accounts[0] }
         );
         expect(await getVersion(registry.address)).to.equal(2);
+        expect(await getIPFSHash(registry.address)).to.equal(ipfsHashes[1]);
       });
     });
 
@@ -106,7 +107,7 @@ contract('MetadataRegistry', (accounts) => {
         await assertRevert(setInitialIPFSHash(accounts[1], accounts[0], ipfsHashes[0]));
       });
 
-      it('should revert if msg.sender is not a delegate (deployer)', async () => {
+      it('should revert if msg.sender is not the deployer on initialization', async () => {
         await assertRevert(setInitialIPFSHash(registry.address, accounts[1], ipfsHashes[0]));
       });
 
@@ -122,6 +123,7 @@ contract('MetadataRegistry', (accounts) => {
           )
         );
         expect(await getIPFSHash(registry.address)).to.equal(ipfsHashes[0]);
+        expect(await getDelegate(registry.address)).to.equal(accounts[0]);
       });
 
       it('should revert if not initialized by a nonce', async () => {
@@ -166,6 +168,10 @@ contract('MetadataRegistry', (accounts) => {
     context('when the transaction fails', () => {
       it('should prevent clearing non-existant entry', async () => {
         await assertRevert(registry.clearEntry(registry.address));
+      });
+
+      it('should prevent clearing a non-contract', async () => {
+        await assertRevert(registry.clearEntry(accounts[1]));
       });
     });
   });
@@ -239,6 +245,7 @@ contract('MetadataRegistry', (accounts) => {
       expect(gasSetDelegate).to.not.equal(undefined);
       expect(gasClearEntry).to.not.equal(undefined);
 
+      console.log("         Gas price @ " + gasPrice);
       console.log("         Initializing with setEntry and nonce:");
       console.log("             " + gasSetEntryInitial.inWei + " wei");
       console.log("             " + gasSetEntryInitial.inEth + " ether");
