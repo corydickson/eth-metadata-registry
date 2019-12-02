@@ -9,8 +9,8 @@ const MetadataRegistry = artifacts.require('./MetadataRegistry.sol');
 const NULL_ADDRESS = '0x0000000000000000000000000000000000000000';
 const DEFAULT_GAS_PRICE = 1e11; // 100 Shannon
 
-const SET_ENTRY_INITIAL = 'setEntry(address,bytes32,uint8,uint8,uint256)';
-const SET_ENTRY = 'setEntry(address,bytes32,uint8,uint8)';
+const SET_ENTRY_INITIAL = 'createEntry(address,bytes32,uint8,uint8,uint256)';
+const SET_ENTRY = 'updateEntry(address,bytes32,uint8,uint8)';
 const SET_DELEGATE = 'setDelegate(address,address)';
 const CLEAR_ENTRY = 'clearEntry(address)';
 
@@ -62,7 +62,7 @@ contract('MetadataRegistry', (accounts) => {
     return new BigNumber(await registry.getVersion(registry.address)).toNumber();
   }
 
-  context('> setEntry()', () => {
+  context('> createEntry() && updateEntry()', () => {
     context('when the transaction succeds', () => {
       it('should get IPFS hash after setting', async () => {
         await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
@@ -246,10 +246,10 @@ contract('MetadataRegistry', (accounts) => {
       expect(gasClearEntry).to.not.equal(undefined);
 
       console.log("         Gas price @ " + gasPrice);
-      console.log("         Initializing with setEntry and nonce:");
+      console.log("         Initializing with createEntry and nonce:");
       console.log("             " + gasSetEntryInitial.inWei + " wei");
       console.log("             " + gasSetEntryInitial.inEth + " ether");
-      console.log("         Updating existing using setEntry:");
+      console.log("         Updating existing using updateEntry:");
       console.log("             " + gasSetEntry.inWei + " wei");
       console.log("             " + gasSetEntry.inEth + " ether");
       console.log("         Creating a new delegate with setDelegate:");

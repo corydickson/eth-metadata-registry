@@ -1,0 +1,37 @@
+@startuml
+actor Deployer
+actor Delegate
+
+Deployer -> Registry : createEntry
+activate Registry
+Registry -> Registry: _onlyDeployer
+Registry -> Registry: _setDelegate (msg.sender)
+activate Registry
+Registry -> Entry : << createEntry (contract_addr, ipfsHash) >>
+Registry<--] : EntrySet Event
+deactivate Registry
+[<- Registry: Done
+
+activate Registry
+Delegate -> Registry : updateEntry (contract_addr, ipfsHash)
+Registry -> Registry: _onlyDelegate
+Registry -> Entry : << updateEntry (contract_addr, ipfsHash) >>
+Registry<--] : UpdatedEntry Event
+deactivate Registry
+[<- Registry: Done
+
+activate Registry
+Delegate -> Registry : clearEntry (contract_addr)
+Registry -> Registry: _onlyDelegate
+Registry -> Entry : << clearEntry (contract_addr) >>
+Registry<--] : EntryCleared Event
+deactivate Registry
+[<- Registry: Done
+
+activate Registry
+Delegate -> Registry : setDelegate (new_addr)
+Registry -> Entry: << setDelegate (new_addr) >>
+Registry<--] : DelegateSet Event
+deactivate Registry
+[<- Registry: Done
+@enduml

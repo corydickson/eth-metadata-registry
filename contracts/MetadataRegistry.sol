@@ -63,7 +63,7 @@ contract MetadataRegistry {
    * @param _size length of the digest
    * @param _nonce number of tx of deployment key;
    */
-  function setEntry(
+  function createEntry(
     address _contract,
     bytes32 _digest,
     uint8 _hashFunction,
@@ -86,7 +86,7 @@ contract MetadataRegistry {
    * @param _size length of the digest
    */
 
-  function setEntry(
+  function updateEntry(
     address _contract,
     bytes32 _digest,
     uint8 _hashFunction,
