@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/gh1dra/eth-metadata-registry.svg?branch=master)](https://travis-ci.com/corydickson/eth-metadata-registry)
+[![Build Status](https://travis-ci.com/corydickson/eth-metadata-registry.svg?branch=master)](https://travis-ci.com/corydickson/eth-metadata-registry)
 # On-chain IPFS Metadata Registry
 
 Just like it sounds! Use your deployment keys to link metadata stored on IPFS to your contracts.
