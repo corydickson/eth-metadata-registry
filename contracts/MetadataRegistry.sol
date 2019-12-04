@@ -19,6 +19,9 @@ pragma experimental ABIEncoderV2;
 
 
 contract MetadataRegistry {
+
+  address constant ANY_ADDRESS = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF;
+
   struct Entry {
     address delegate;
     bytes32 digest;
@@ -46,7 +49,8 @@ contract MetadataRegistry {
 
   modifier onlyDelegate(address _contract) {
     require(entries[_contract].delegate != address(0), "Error: delegate cannot be empty");
-    require(msg.sender == entries[_contract].delegate, "Error: msg.sender is not a delegate");
+    if (entries[_contract].delegate != ANY_ADDRESS)
+      require(msg.sender == entries[_contract].delegate, "Error: msg.sender is not a delegate");
     _;
   }
 
@@ -122,6 +126,7 @@ contract MetadataRegistry {
   public
   onlyDelegate(_contract)
   {
+    require(entries[_contract].delegate != ANY_ADDRESS, "Error: Deployer made all ethereum addresses' delegates");
     entries[_contract].delegate = _delegate;
     emit SetDelegate(_contract, _delegate);
   }

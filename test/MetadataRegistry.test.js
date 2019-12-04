@@ -7,6 +7,7 @@ import expectEvent from './helpers/expectEvent';
 
 const MetadataRegistry = artifacts.require('./MetadataRegistry.sol');
 const NULL_ADDRESS = '0x0000000000000000000000000000000000000000';
+const ANY_ADDRESS = '0xffffffffffffffffffffffffffffffffffffffff';
 const DEFAULT_GAS_PRICE = 1e11; // 100 Shannon
 
 const SET_ENTRY_INITIAL = 'createEntry(address,bytes32,uint8,uint8,uint256)';
@@ -99,6 +100,20 @@ contract('MetadataRegistry', (accounts) => {
         );
         expect(await getVersion(registry.address)).to.equal(2);
         expect(await getIPFSHash(registry.address)).to.equal(ipfsHashes[1]);
+      });
+
+      it('should allow the deployer to set any ethereum address to be a valid delegate', async () => {
+        await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
+        await registry.setDelegate(registry.address, ANY_ADDRESS, { from: accounts[0] });
+
+        const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
+
+        await registry.methods[SET_ENTRY](
+          registry.address, digest, hashFunction, size, { from: accounts[1] }
+        );
+
+        expect(await getIPFSHash(registry.address)).to.equal(ipfsHashes[1]);
+        expect(await getVersion(registry.address)).to.equal(2);
       });
     });
 
@@ -199,6 +214,12 @@ contract('MetadataRegistry', (accounts) => {
       });
 
       it('should revert if msg.sender is not a delegate', async () => {
+        await assertRevert(registry.setDelegate(registry.address, accounts[1], { from: accounts[2] }));
+      });
+
+      it('should allow the deployer to set any ethereum address to be a valid delegate', async () => {
+        await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
+        await registry.setDelegate(registry.address, ANY_ADDRESS, { from: accounts[0] });
         await assertRevert(registry.setDelegate(registry.address, accounts[1], { from: accounts[2] }));
       });
     });
