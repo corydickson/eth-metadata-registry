@@ -1,0 +1,29 @@
+specVersion: 0.0.2
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum/contract
+    name: Contract
+    network: mainnet
+    source:
+      address: "0xa23E8B119A26D36099ee97F0c7dFb8DB20B50D7D"
+      abi: Contract
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.3
+      language: wasm/assemblyscript
+      entities:
+        - EntrySet
+        - EntryDeleted
+        - SetDelegate
+      abis:
+        - name: Contract
+          file: ./abis/Contract.json
+      eventHandlers:
+        - event: EntrySet(indexed address,indexed address,bytes32,uint8,uint8,bool,uint256)
+          handler: handleEntrySet
+        - event: EntryDeleted(indexed address,uint256)
+          handler: handleEntryDeleted
+        - event: SetDelegate(indexed address,indexed address)
+          handler: handleSetDelegate
+      file: ./src/mapping.ts

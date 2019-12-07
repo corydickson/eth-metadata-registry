@@ -8,5 +8,6 @@ cache:
 before_script:
   - truffle version
 script:
-  - npm run lint:sol
-  - npm run test
+  - yarn install
+  - yarn run lint:sol
+  - yarn run test

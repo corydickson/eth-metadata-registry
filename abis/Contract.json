@@ -1,0 +1,115 @@
+[
+  {
+    "constant": true,
+    "inputs": [{ "name": "_address", "type": "address" }],
+    "name": "getIPFSMultihash",
+    "outputs": [
+      { "name": "digest", "type": "bytes32" },
+      { "name": "hashFunction", "type": "uint8" },
+      { "name": "size", "type": "uint8" }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      { "name": "_contract", "type": "address" },
+      { "name": "_digest", "type": "bytes32" },
+      { "name": "_hashFunction", "type": "uint8" },
+      { "name": "_size", "type": "uint8" },
+      { "name": "_nonce", "type": "int256" }
+    ],
+    "name": "createEntry",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [{ "name": "_address", "type": "address" }],
+    "name": "getDelegate",
+    "outputs": [{ "name": "delegate", "type": "address" }],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      { "name": "_contract", "type": "address" },
+      { "name": "_delegate", "type": "address" }
+    ],
+    "name": "setDelegate",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [{ "name": "_contract", "type": "address" }],
+    "name": "clearEntry",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [{ "name": "_address", "type": "address" }],
+    "name": "getVersion",
+    "outputs": [{ "name": "", "type": "uint256" }],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      { "name": "_contract", "type": "address" },
+      { "name": "_digest", "type": "bytes32" },
+      { "name": "_hashFunction", "type": "uint8" },
+      { "name": "_size", "type": "uint8" }
+    ],
+    "name": "updateEntry",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "contractAddress", "type": "address" },
+      { "indexed": true, "name": "delegate", "type": "address" },
+      { "indexed": false, "name": "digest", "type": "bytes32" },
+      { "indexed": false, "name": "hashFunction", "type": "uint8" },
+      { "indexed": false, "name": "size", "type": "uint8" },
+      { "indexed": false, "name": "selfAttested", "type": "bool" },
+      { "indexed": false, "name": "latest", "type": "uint256" }
+    ],
+    "name": "EntrySet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "contractAddress", "type": "address" },
+      { "indexed": false, "name": "latest", "type": "uint256" }
+    ],
+    "name": "EntryDeleted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "contractAddress", "type": "address" },
+      { "indexed": true, "name": "delegate", "type": "address" }
+    ],
+    "name": "SetDelegate",
+    "type": "event"
+  }
+]

@@ -12,11 +12,17 @@
   },
   "scripts": {
     "test": "truffle test",
-    "lint": "npm run lint:sol && npm run lint:js",
+    "lint": "yarn run lint:sol && yarn run lint:js",
     "lint:js": "eslint .",
     "lint:js:fix": "eslint . --fix",
     "lint:sol": "solium -d ./contracts/",
-    "lint:sol:fix": "solium -d . --fix"
+    "lint:sol:fix": "solium -d . --fix",
+    "codegen": "graph codegen",
+    "build": "graph build",
+    "deploy": "graph deploy --node https://api.thegraph.com/deploy/ --ipfs https://api.thegraph.com/ipfs/ MetadataRegistry",
+    "create-local": "graph create --node http://localhost:8020/ MetadataRegistry",
+    "remove-local": "graph remove --node http://localhost:8020/ MetadataRegistry",
+    "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 MetadataRegistry"
   },
   "keywords": [
     "multihash",
@@ -28,7 +34,9 @@
   "license": "MIT",
   "dependencies": {
     "bignumber.js": "^9.0.0",
-    "bs58": "^4.0.1"
+    "bs58": "^4.0.1",
+    "@graphprotocol/graph-cli": "0.16.2",
+    "@graphprotocol/graph-ts": "0.16.0"
   },
   "devDependencies": {
     "@babel/cli": "^7.7.4",
