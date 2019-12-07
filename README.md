@@ -37,8 +37,8 @@ clearEntry | 172312000000000 | 0.000172312
 
 ## Install
 
-`npm install`
+`yarn install`
 
 ## Testing
 
-`npm run test`
+`yarn run test`
