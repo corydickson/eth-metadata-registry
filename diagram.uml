@@ -16,7 +16,7 @@ activate Registry
 Delegate -> Registry : updateEntry (contract_addr, ipfsHash)
 Registry -> Registry: _onlyDelegate
 Registry -> Entry : << updateEntry (contract_addr, ipfsHash) >>
-Registry<--] : UpdatedEntry Event
+Registry<--] : EntrySet Event
 deactivate Registry
 [<- Registry: Done
 
@@ -24,14 +24,14 @@ activate Registry
 Delegate -> Registry : clearEntry (contract_addr)
 Registry -> Registry: _onlyDelegate
 Registry -> Entry : << clearEntry (contract_addr) >>
-Registry<--] : EntryCleared Event
+Registry<--] : EntryDeleted Event
 deactivate Registry
 [<- Registry: Done
 
 activate Registry
 Delegate -> Registry : setDelegate (new_addr)
 Registry -> Entry: << setDelegate (new_addr) >>
-Registry<--] : DelegateSet Event
+Registry<--] : SetDelegate Event
 deactivate Registry
 [<- Registry: Done
 @enduml

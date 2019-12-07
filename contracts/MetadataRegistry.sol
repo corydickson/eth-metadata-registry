@@ -1,4 +1,4 @@
-pragma solidity >=0.4.22 < 0.6.0;
+pragma solidity >=0.4.22 < 0.4.25;
 pragma experimental ABIEncoderV2;
 
 /**
@@ -21,8 +21,10 @@ pragma experimental ABIEncoderV2;
 contract MetadataRegistry {
 
   address constant ANY_ADDRESS = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF;
+  int constant INVALID_NONCE = -1;
 
   struct Entry {
+    bool selfAttested;
     address delegate;
     bytes32 digest;
     uint8 hashFunction;
@@ -37,7 +39,9 @@ contract MetadataRegistry {
     address indexed delegate,
     bytes32 digest,
     uint8 hashFunction,
-    uint8 size
+    uint8 size,
+    bool selfAttested,
+    uint latest
   );
 
   event EntryDeleted (
@@ -45,17 +49,15 @@ contract MetadataRegistry {
     uint latest
   );
 
-  event SetDelegate(address indexed contractAddress, address indexed delegate);
+  event SetDelegate (
+    address indexed contractAddress,
+    address indexed delegate
+  );
 
   modifier onlyDelegate(address _contract) {
     require(entries[_contract].delegate != address(0), "Error: delegate cannot be empty");
     if (entries[_contract].delegate != ANY_ADDRESS)
       require(msg.sender == entries[_contract].delegate, "Error: msg.sender is not a delegate");
-    _;
-  }
-
-  modifier onlyContracts(address _contract) {
-    require(isContract(_contract), "Error: address provided is not a contract");
     _;
   }
 
@@ -72,14 +74,14 @@ contract MetadataRegistry {
     bytes32 _digest,
     uint8 _hashFunction,
     uint8 _size,
-    uint _nonce
+    int _nonce
   )
   public
-  onlyContracts(_contract)
   {
+    require(_size != uint8(0), "Error: a size must be given");
+    require(_nonce > 0, "Error: invalid nonce provided");
     require(entries[_contract].delegate == address(0), "Error: contract entry has already been initialized");
-    require(isDeployer(msg.sender, _contract, _nonce), "Error: msg.sender is not contract deployer");
-    _setEntry(_contract, _digest, _hashFunction, _size);
+    _setEntry(_contract, _digest, _hashFunction, _size, _nonce);
   }
 
   /**
@@ -98,9 +100,8 @@ contract MetadataRegistry {
   )
   public
   onlyDelegate(_contract)
-  onlyContracts(_contract)
   {
-    _setEntry(_contract, _digest, _hashFunction, _size);
+    _setEntry(_contract, _digest, _hashFunction, _size, INVALID_NONCE);
   }
 
   /**
@@ -174,17 +175,25 @@ contract MetadataRegistry {
     address _contract,
     bytes32 _digest,
     uint8 _hashFunction,
-    uint8 _size
+    uint8 _size,
+    int _nonce
   )
   private
   {
+    bool selfAttested = _contract == msg.sender;
+
+    if (!selfAttested && _nonce != INVALID_NONCE) { // we should never get here with user input
+      require(isContract(_contract), "Error: address provided is not a contract");
+      require(isDeployer(msg.sender, _contract, _nonce), "Error: msg.sender is not contract deployer");
+    }
+
     Entry memory entry = Entry(
+      selfAttested,
       msg.sender,
       _digest,
       _hashFunction,
       _size
     );
-
     entries[_contract] = entry;
     versions[_contract] += 1;
 
@@ -193,7 +202,9 @@ contract MetadataRegistry {
       msg.sender,
       _digest,
       _hashFunction,
-      _size
+      _size,
+      selfAttested,
+      versions[_contract]
     );
   }
 
@@ -206,11 +217,11 @@ contract MetadataRegistry {
     return (size > 0);
   }
 
-  function isDeployer(address _sender, address _contract, uint _nonce) private returns (bool valid) {
+  function isDeployer(address _sender, address _contract, int _nonce) private returns (bool valid) {
     return addressFrom(_sender, _nonce) == _contract;
   }
 
-  function addressFrom(address _origin, uint _nonce) private pure returns (address) {
+  function addressFrom(address _origin, int _nonce) private pure returns (address) {
     // https://ethereum.stackexchange.com/a/47083
     if (_nonce == 0x00)
       return address(keccak256(byte(0xd6), byte(0x94), _origin, byte(0x80)));
