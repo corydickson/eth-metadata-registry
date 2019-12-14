@@ -29,10 +29,12 @@ contract MetadataRegistry {
     bytes32 digest;
     uint8 hashFunction;
     uint8 size;
+    bool isValid;
   }
 
   mapping (address => Entry) private entries;
   mapping (address => uint) private versions;
+  mapping (address => address) private deployers;
 
   event EntrySet (
     address indexed contractAddress,
@@ -58,6 +60,11 @@ contract MetadataRegistry {
     require(entries[_contract].delegate != address(0), "Error: delegate cannot be empty");
     if (entries[_contract].delegate != ANY_ADDRESS)
       require(msg.sender == entries[_contract].delegate, "Error: msg.sender is not a delegate");
+    _;
+  }
+
+  modifier onlyValidEntries(address _contract) {
+    require(entries[_contract].isValid, "Error: contract does not exist");
     _;
   }
 
@@ -100,6 +107,7 @@ contract MetadataRegistry {
   )
   public
   onlyDelegate(_contract)
+  onlyValidEntries(_contract)
   {
     _setEntry(_contract, _digest, _hashFunction, _size, INVALID_NONCE);
   }
@@ -111,6 +119,7 @@ contract MetadataRegistry {
   function clearEntry(address _contract)
   public
   onlyDelegate(_contract)
+  onlyValidEntries(_contract)
   {
     require(entries[_contract].digest != 0, "Error: missing entry");
     delete entries[_contract];
@@ -126,6 +135,7 @@ contract MetadataRegistry {
   function setDelegate(address _contract, address _delegate)
   public
   onlyDelegate(_contract)
+  onlyValidEntries(_contract)
   {
     require(entries[_contract].delegate != ANY_ADDRESS, "Error: Deployer made all ethereum addresses' delegates");
     entries[_contract].delegate = _delegate;
@@ -139,10 +149,24 @@ contract MetadataRegistry {
   function getIPFSMultihash(address _address)
   public
   view
+  onlyValidEntries(_address)
   returns(bytes32 digest, uint8 hashFunction, uint8 size)
   {
     Entry storage entry = entries[_address];
     return (entry.digest, entry.hashFunction, entry.size);
+  }
+
+  /**
+  * @dev checks if the latests entry is curated
+  * @param _contract address of the associated contract
+  */
+  function isCurated(address _contract)
+  public
+  view
+  onlyValidEntries(_contract)
+  returns(bool)
+  {
+    return entries[_contract].delegate == deployers[_contract];
   }
 
   /**
@@ -152,6 +176,7 @@ contract MetadataRegistry {
   function getDelegate(address _address)
   public
   view
+  onlyValidEntries(_address)
   returns(address delegate)
   {
     Entry storage entry = entries[_address];
@@ -185,6 +210,7 @@ contract MetadataRegistry {
     if (!selfAttested && _nonce != INVALID_NONCE) { // we should never get here with user input
       require(isContract(_contract), "Error: address provided is not a contract");
       require(isDeployer(msg.sender, _contract, _nonce), "Error: msg.sender is not contract deployer");
+      deployers[_contract] = msg.sender; // this is so we know if it's curated
     }
 
     Entry memory entry = Entry(
@@ -192,7 +218,8 @@ contract MetadataRegistry {
       msg.sender,
       _digest,
       _hashFunction,
-      _size
+      _size,
+      true
     );
     entries[_contract] = entry;
     versions[_contract] += 1;

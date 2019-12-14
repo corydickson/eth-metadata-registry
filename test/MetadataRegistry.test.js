@@ -63,6 +63,10 @@ contract('MetadataRegistry', (accounts) => {
     return new BigNumber(await registry.getVersion(registry.address)).toNumber();
   }
 
+  async function getCurated(contractAddr) {
+    return Boolean(await registry.isCurated(contractAddr));
+  }
+
   context('> Publishing with createEntry() && updateEntry()', () => {
     context('when the transaction succeds', () => {
       it('should get IPFS hash after setting', async () => {
@@ -92,13 +96,19 @@ contract('MetadataRegistry', (accounts) => {
       });
 
       it('should increase the version for that particular contract', async () => {
-        expect(await getVersion(registry.address)).to.equal(0);
         await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
+        const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
+
         expect(await getVersion(registry.address)).to.equal(1);
+
+        await registry.methods[SET_ENTRY](
+          registry.address, digest, hashFunction, size, { from: accounts[0] }
+        );
+
+        expect(await getVersion(registry.address)).to.equal(2);
       });
 
       it('should get the delegate after setting', async () => {
-        expect(await getDelegate(registry.address)).to.equal(NULL_ADDRESS);
         await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
         expect(await getDelegate(registry.address)).to.equal(accounts[0]);
       });
@@ -202,7 +212,7 @@ contract('MetadataRegistry', (accounts) => {
         expect(await getIPFSHash(registry.address)).to.equal(ipfsHashes[0]);
 
         await registry.clearEntry(registry.address);
-        expect(await getIPFSHash(registry.address)).to.be.a('null');
+        await assertRevert(getIPFSHash(registry.address));
       });
 
       it('should fire event when entry is cleared', async () => {
@@ -218,8 +228,14 @@ contract('MetadataRegistry', (accounts) => {
         await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
         expect(await getVersion(registry.address)).to.equal(1);
 
+        const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
+
+        await registry.methods[SET_ENTRY](
+          registry.address, digest, hashFunction, size, { from: accounts[0] }
+        );
+
         await registry.clearEntry(registry.address);
-        expect(await getVersion(registry.address)).to.equal(0);
+        expect(await getVersion(registry.address)).to.equal(1);
       });
     });
 
@@ -265,6 +281,14 @@ contract('MetadataRegistry', (accounts) => {
         await registry.setDelegate(registry.address, ANY_ADDRESS, { from: accounts[0] });
         await assertRevert(registry.setDelegate(registry.address, accounts[1], { from: accounts[2] }));
       });
+    });
+  });
+
+  context('> View methods', () => {
+    it('should revert calling view functions on non-existent entries', async () => {
+      await assertRevert(getDelegate(registry.address));
+      await assertRevert(getIPFSHash(registry.address));
+      await assertRevert(getCurated(registry.address));
     });
   });
 
