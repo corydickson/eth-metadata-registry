@@ -15,13 +15,10 @@ pragma experimental ABIEncoderV2;
  * they can delegate that ability to another address. Delegates then become sole owners
  * of publishing permissions for specified contract in the registry.
  * Inspired by: https://github.com/saurfang/ipfs-multihash-on-solidity
- */
-
+*/
 
 contract MetadataRegistry {
-
   address constant ANY_ADDRESS = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF;
-  int constant INVALID_NONCE = -1;
 
   struct Entry {
     bool selfAttested;
@@ -39,9 +36,7 @@ contract MetadataRegistry {
     address indexed delegate,
     bytes32 digest,
     uint8 hashFunction,
-    uint8 size,
-    bool selfAttested,
-    uint latest
+    uint8 size
   );
 
   event EntryDeleted (
@@ -61,27 +56,54 @@ contract MetadataRegistry {
     _;
   }
 
+  modifier onlyDeployer(address _contract, bool _create2, int _nonce, bytes32 _salt, bytes memory _code) {
+    require(entries[_contract].delegate == address(0), "Error: contract entry has already been initialized");
+    if (_contract != msg.sender) {
+      address _res = address(0);
+      if (_create2) {
+        _res = calculateCreate2Addr(msg.sender, _salt, _code);
+      } else {
+        require(_nonce > 0, "Error: invalid nonce provided");
+        _res = addressFrom(msg.sender, _nonce);
+      }
+      require(_res == _contract, "Error: msg.sender must be the deployment key");
+    }
+    _;
+  }
+
   /**
    * @dev Initialize association of a multihash with a contract if the deployer sends a tx
    * @param _contract address of the associated contract
    * @param _digest hash digest produced by hashing content using hash function
    * @param _hashFunction hashFunction code for the hash function used
    * @param _size length of the digest
-   * @param _nonce number of tx of deployment key;
+   * @param _nonce number of tx of deployment key
+   * @param _salt vanity bytes used to generate the contract address
+   * @param _code initialization bytecode used to the logic in the contract
+   * @param _opcode represents which opcode used to calculate the contract address, where create2 = true and create = false
    */
-  function createEntry(
+  function createEntry (
     address _contract,
     bytes32 _digest,
     uint8 _hashFunction,
     uint8 _size,
-    int _nonce
+    int _nonce,
+    bytes32 _salt,
+    bytes memory _code,
+    bool _opcode
   )
   public
+  onlyDeployer(_contract, _opcode, _nonce, _salt, _code)
   {
-    require(_size != uint8(0), "Error: a size must be given");
-    require(_nonce > 0, "Error: invalid nonce provided");
-    require(entries[_contract].delegate == address(0), "Error: contract entry has already been initialized");
-    _setEntry(_contract, _digest, _hashFunction, _size, _nonce);
+    _setEntry(_contract, _digest, _hashFunction, _size);
+
+    emit EntrySet(
+      _contract,
+      msg.sender,
+      _digest,
+      _hashFunction,
+      _size
+    );
   }
 
   /**
@@ -91,8 +113,7 @@ contract MetadataRegistry {
    * @param _hashFunction hashFunction code for the hash function used
    * @param _size length of the digest
    */
-
-  function updateEntry(
+  function updateEntry (
     address _contract,
     bytes32 _digest,
     uint8 _hashFunction,
@@ -101,7 +122,15 @@ contract MetadataRegistry {
   public
   onlyDelegate(_contract)
   {
-    _setEntry(_contract, _digest, _hashFunction, _size, INVALID_NONCE);
+    _setEntry(_contract, _digest, _hashFunction, _size);
+
+    emit EntrySet(
+      _contract,
+      msg.sender,
+      _digest,
+      _hashFunction,
+      _size
+    );
   }
 
   /**
@@ -175,17 +204,12 @@ contract MetadataRegistry {
     address _contract,
     bytes32 _digest,
     uint8 _hashFunction,
-    uint8 _size,
-    int _nonce
+    uint8 _size
   )
   private
   {
+    require(_size != uint8(0), "Error: a size must be given");
     bool selfAttested = _contract == msg.sender;
-
-    if (!selfAttested && _nonce != INVALID_NONCE) { // we should never get here with user input
-      require(isContract(_contract), "Error: address provided is not a contract");
-      require(isDeployer(msg.sender, _contract, _nonce), "Error: msg.sender is not contract deployer");
-    }
 
     Entry memory entry = Entry(
       selfAttested,
@@ -196,29 +220,16 @@ contract MetadataRegistry {
     );
     entries[_contract] = entry;
     versions[_contract] += 1;
-
-    emit EntrySet(
-      _contract,
-      msg.sender,
-      _digest,
-      _hashFunction,
-      _size,
-      selfAttested,
-      versions[_contract]
-    );
   }
 
-  function isContract(address _addr) private returns (bool valid) {
-    uint32 size;
-    assembly {
-      size := extcodesize(_addr)
-    }
-
-    return (size > 0);
-  }
-
-  function isDeployer(address _sender, address _contract, int _nonce) private returns (bool valid) {
-    return addressFrom(_sender, _nonce) == _contract;
+  /**
+  * @dev Calculates the address generated using the create2 opcode. For testing purposes only...
+  * @return calculated Address
+  */
+  function calculateCreate2Addr(address _origin, bytes32 _salt, bytes memory _code) public pure returns (address) {
+    // Assumes no memory expansion
+    // keccak256( 0xff ++ address ++ salt ++ keccak256(init_code))[12:]
+    return address(keccak256(byte(0xff), _origin, _salt, keccak256(_code)));
   }
 
   function addressFrom(address _origin, int _nonce) private pure returns (address) {

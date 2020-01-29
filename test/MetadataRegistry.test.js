@@ -9,9 +9,12 @@ const MetadataRegistry = artifacts.require('./MetadataRegistry.sol');
 const NULL_ADDRESS = '0x0000000000000000000000000000000000000000';
 const ANY_ADDRESS = '0xffffffffffffffffffffffffffffffffffffffff';
 const DEFAULT_GAS_PRICE = 1e11; // 100 Shannon
+const DEFAULT_SALT = '0x00';
+const DEFAULT_CODE = '0x0';
+const INVALID_NONCE = -1;
 
-const SET_ENTRY_INITIAL = 'createEntry(address,bytes32,uint8,uint8,int256)';
-const SET_ENTRY = 'updateEntry(address,bytes32,uint8,uint8)';
+const CREATE_ENTRY = 'createEntry(address,bytes32,uint8,uint8,int256,bytes32,bytes,bool)';
+const UPDATE_ENTRY = 'updateEntry(address,bytes32,uint8,uint8)';
 const SET_DELEGATE = 'setDelegate(address,address)';
 const CLEAR_ENTRY = 'clearEntry(address)';
 
@@ -42,13 +45,20 @@ contract('MetadataRegistry', (accounts) => {
     });
   }
 
-  async function setInitialIPFSHash(contractAddr, account, hash) {
+  async function setInitialIPFSHash(contractAddr, account, hash, salt, init_code, create2 = false) {
     const { digest, hashFunction, size } = getBytes32FromMultihash(hash);
-    let nonce = await web3.eth.getTransactionCount(account) - 1; // the nonce before the contract was deployed
+    if (create2) {
+      return registry.methods[CREATE_ENTRY](
+        contractAddr, digest, hashFunction, size, INVALID_NONCE, salt, init_code, true, { from: account }
+      );
+    }
 
-    return registry.methods[SET_ENTRY_INITIAL](
-      contractAddr, digest, hashFunction, size, nonce, { from: account }
-    );
+    else {
+      let nonce = await web3.eth.getTransactionCount(account) - 1; // the nonce before the contract was deployed
+      return registry.methods[CREATE_ENTRY](
+        contractAddr, digest, hashFunction, size, nonce, DEFAULT_SALT, DEFAULT_CODE, false, { from: account }
+      );
+    }
   }
 
   async function getIPFSHash(contractAddr) {
@@ -63,6 +73,32 @@ contract('MetadataRegistry', (accounts) => {
     return new BigNumber(await registry.getVersion(registry.address)).toNumber();
   }
 
+  context('> Verify onlyDeployer create2 modifier', () => {
+    it('should calculate the right values', async () => {
+      expect(await registry.calculateCreate2Addr(
+        "0x0000000000000000000000000000000000000000", "0x0000000000000000000000000000000000000000000000000000000000000000", "0x00", { from: accounts[0] }
+      )).to.equal("0x4D1A2e2bB4F88F0250f26Ffff098B0b30B26BF38");
+
+      expect(await registry.calculateCreate2Addr(
+        "0xdeadbeef00000000000000000000000000000000", "0x000000000000000000000000feed000000000000000000000000000000000000", "0x00", { from: accounts[0] }
+      )).to.equal("0xD04116cDd17beBE565EB2422F2497E06cC1C9833");
+
+      expect(await registry.calculateCreate2Addr(
+        "0x0000000000000000000000000000000000000000", "0x0000000000000000000000000000000000000000000000000000000000000", "0xdeadbeef", { from: accounts[0] }
+      )).to.equal("0x70f2b2914A2a4b783FaEFb75f459A580616Fcb5e");
+
+      expect(await registry.calculateCreate2Addr(
+        "0x00000000000000000000000000000000deadbeef", "0x00000000000000000000000000000000000000000000000000000000cafebabe", "0xdeadbeef", { from: accounts[0] }
+      )).to.equal("0x60f3f640a8508fC6a86d45DF051962668E1e8AC7");
+
+      expect(await registry.calculateCreate2Addr(
+        "0x00000000000000000000000000000000deadbeef", "0x00000000000000000000000000000000000000000000000000000000cafebabe",
+        "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+        { from: accounts[0] }
+      )).to.equal("0x1d8bfDC5D46DC4f61D6b6115972536eBE6A8854C");
+    });
+  });
+
   context('> Publishing with createEntry() && updateEntry()', () => {
     context('when the transaction succeds', () => {
       it('should get IPFS hash after setting', async () => {
@@ -70,16 +106,21 @@ contract('MetadataRegistry', (accounts) => {
         expect(await getIPFSHash(registry.address)).to.equal(ipfsHashes[0]);
       });
 
-      it('should fire event when new has is set', async () => {
+      /*
+       * TODO: We need to have a test case that covers an address that has been deployed with create2
+       * The problem is that collisions can occur and there is no way to test if that contract has been deployed to the calculated address
+       */
+
+      it('should fire event when new entry has been set', async () => {
         await expectEvent(
-          setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]),
+          await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]),
           'EntrySet',
         );
 
         const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
 
         await expectEvent(
-          registry.methods[SET_ENTRY](
+          registry.methods[UPDATE_ENTRY](
             registry.address, digest, hashFunction, size, { from: accounts[0] }
           ),
           'EntrySet',
@@ -109,7 +150,7 @@ contract('MetadataRegistry', (accounts) => {
 
         const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
 
-        await registry.methods[SET_ENTRY](
+        await registry.methods[UPDATE_ENTRY](
           registry.address, digest, hashFunction, size, { from: accounts[0] }
         );
         expect(await getVersion(registry.address)).to.equal(2);
@@ -122,7 +163,7 @@ contract('MetadataRegistry', (accounts) => {
 
         const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
 
-        await registry.methods[SET_ENTRY](
+        await registry.methods[UPDATE_ENTRY](
           registry.address, digest, hashFunction, size, { from: accounts[1] }
         );
 
@@ -139,7 +180,7 @@ contract('MetadataRegistry', (accounts) => {
       it('should revert if supplied a bogus nonce', async () => {
         const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[0]);
         await assertRevert(
-          registry.methods[SET_ENTRY_INITIAL](registry.address, digest, hashFunction, size, -1, { from: accounts[0]})
+          registry.methods[CREATE_ENTRY](registry.address, digest, hashFunction, size, -1, "0x0", "0x0", false, { from: accounts[0]})
         );
       });
 
@@ -147,7 +188,7 @@ contract('MetadataRegistry', (accounts) => {
         const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[0]);
         let nonce = await web3.eth.getTransactionCount(accounts[0]) - 1;
         await assertRevert(
-          registry.methods[SET_ENTRY_INITIAL](registry.address, digest, hashFunction, 0, nonce, { from: accounts[0]})
+          registry.methods[CREATE_ENTRY](registry.address, digest, hashFunction, 0, nonce, "0x0", "0x0", false, { from: accounts[0]})
         );
       });
 
@@ -162,8 +203,8 @@ contract('MetadataRegistry', (accounts) => {
         const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
 
         await assertRevert(
-          registry.methods[SET_ENTRY](
-            registry.address, digest, hashFunction, size, { from: accounts[1] }
+          registry.methods[CREATE_ENTRY](
+            registry.address, digest, hashFunction, size, -1, "0x0", "0x0", false, { from: accounts[1] }
           )
         );
         expect(await getIPFSHash(registry.address)).to.equal(ipfsHashes[0]);
@@ -175,8 +216,8 @@ contract('MetadataRegistry', (accounts) => {
 
         const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
         await assertRevert(
-          registry.methods[SET_ENTRY](
-            accounts[1], digest, hashFunction, size, { from: accounts[0] }
+          registry.methods[CREATE_ENTRY](
+            accounts[1], digest, hashFunction, size, -1, "0x0", "0x0", false, { from: accounts[0] }
           )
         );
 
@@ -187,8 +228,8 @@ contract('MetadataRegistry', (accounts) => {
       it('should revert if not initialized by a nonce', async () => {
         const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
         await assertRevert(
-          registry.methods[SET_ENTRY](
-            registry.address, digest, hashFunction, size, { from: accounts[0] }
+          registry.methods[CREATE_ENTRY](
+            registry.address, digest, hashFunction, size, -1, "0x0", "0x0", false, { from: accounts[0] }
           )
         );
       });
@@ -281,7 +322,7 @@ contract('MetadataRegistry', (accounts) => {
       }
 
       gasSetEntryInitial = await formatPrice(
-        await calculateGas(accounts[0], SET_ENTRY_INITIAL, [registry.address, digest, hashFunction, size, nonce]),
+        await calculateGas(accounts[0], CREATE_ENTRY, [registry.address, digest, hashFunction, size, nonce, "0x0", "0x0", false]),
         gasPrice
       );
 
@@ -289,7 +330,7 @@ contract('MetadataRegistry', (accounts) => {
       await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
 
       gasSetEntry = await formatPrice(
-        await calculateGas(accounts[0], SET_ENTRY, [registry.address, digest, hashFunction, size]),
+        await calculateGas(accounts[0], UPDATE_ENTRY, [registry.address, digest, hashFunction, size]),
         gasPrice
       );
 
