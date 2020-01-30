@@ -311,8 +311,8 @@ contract('MetadataRegistry', (accounts) => {
 
   context('Estimate gas cost:', () => {
     it('should calculate the gas', async () => {
-      let gasSetEntryInitial, gasSetEntry, gasClearEntry, gasSetDelegate;
-      const {digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[0]);
+      let gasCreateEntry, gasCreate2Generation, gasSetEntry, gasClearEntry, gasSetDelegate;
+      const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[0]);
       const nonce = await web3.eth.getTransactionCount(accounts[0]) - 1;
       const gasPrice = await getGasPrice();
 
@@ -321,8 +321,13 @@ contract('MetadataRegistry', (accounts) => {
         return { inWei: total, inEth: await web3.utils.fromWei(total.toString(), 'ether') };
       }
 
-      gasSetEntryInitial = await formatPrice(
+      gasCreateEntry = await formatPrice(
         await calculateGas(accounts[0], CREATE_ENTRY, [registry.address, digest, hashFunction, size, nonce, "0x0", "0x0", false]),
+        gasPrice
+      );
+
+      gasCreate2Generation = await formatPrice(
+        await calculateGas(accounts[0], "calculateCreate2Addr(address,bytes32,bytes)", [accounts[0], DEFAULT_SALT, DEFAULT_CODE]),
         gasPrice
       );
 
@@ -345,15 +350,15 @@ contract('MetadataRegistry', (accounts) => {
       );
 
       // assert gas has been calculated
-      expect(gasSetEntryInitial).to.not.equal(undefined);
+      expect(gasCreateEntry).to.not.equal(undefined);
       expect(gasSetEntry).to.not.equal(undefined);
       expect(gasSetDelegate).to.not.equal(undefined);
       expect(gasClearEntry).to.not.equal(undefined);
 
       console.log("         Gas price @ " + gasPrice);
       console.log("         Initializing with createEntry and nonce:");
-      console.log("             " + gasSetEntryInitial.inWei + " wei");
-      console.log("             " + gasSetEntryInitial.inEth + " ether");
+      console.log("             " + gasCreateEntry.inWei + " wei");
+      console.log("             " + gasCreateEntry.inEth + " ether");
       console.log("         Updating existing using updateEntry:");
       console.log("             " + gasSetEntry.inWei + " wei");
       console.log("             " + gasSetEntry.inEth + " ether");
@@ -363,6 +368,9 @@ contract('MetadataRegistry', (accounts) => {
       console.log("         Clear an existing entry with clearEntry:");
       console.log("             " + gasClearEntry.inWei + " wei");
       console.log("             " + gasClearEntry.inEth + " ether");
+      console.log("         Calculate create2 address:");
+      console.log("             " + gasCreate2Generation.inWei + " wei");
+      console.log("             " + gasCreate2Generation.inEth + " ether");
     });
   })
 });
