@@ -128,6 +128,7 @@ contract MetadataRegistry {
   public
   onlyDelegate(_contract, _categoryID)
   {
+    require(versions[_contract][DEPLOYER_CATEGORY] > 0, "Error: deployer must have set the default entry");
     _setEntry(_contract, _digest, _hashFunction, _size, _categoryID);
 
     emit EntrySet(
@@ -231,7 +232,16 @@ contract MetadataRegistry {
   private
   {
     require(_size != uint8(0), "Error: a size must be given");
+
     bool selfAttested = _contract == msg.sender;
+
+    if (!selfAttested) {
+      uint size;
+      assembly {
+        size := extcodesize(_contract)
+      }
+      require(size > 0, "Error: code must be deployed at contract address");
+    }
 
     Entry memory entry = Entry(
       selfAttested,

@@ -173,7 +173,9 @@ contract('MetadataRegistry', (accounts) => {
         expect(await getVersion(registry.address)).to.equal(2);
       });
 
-      it('should allow non-deployers to add an entry on behalf of an account', async () => {
+      it('should allow non-deployers to add an entry on behalf of an account once deployer has initialized an entry', async () => {
+        await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
+
         const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
         const dappCat = web3.utils.soliditySha3('my-dank-dapp');
 
@@ -225,13 +227,13 @@ contract('MetadataRegistry', (accounts) => {
         expect(await getDelegate(registry.address)).to.equal(accounts[0]);
       });
 
-      it('should revert if msg.sender tries to update an ethereum address', async () => {
+      it('should revert if msg.sender tries to update an EOA', async () => {
         await setInitialIPFSHash(accounts[1], accounts[1], ipfsHashes[0]);
 
         const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
         await assertRevert(
-          registry.methods[CREATE_ENTRY](
-            accounts[1], digest, hashFunction, size, -1, "0x0", "0x0", false, { from: accounts[0] }
+          registry.methods[UPDATE_ENTRY](
+            accounts[1], digest, hashFunction, size, DEFAULT_CATEGORY_ID, { from: accounts[0] }
           )
         );
 
@@ -239,11 +241,22 @@ contract('MetadataRegistry', (accounts) => {
         expect(await getDelegate(accounts[1])).to.equal(accounts[1]);
       });
 
-      it('should revert if not initialized by a nonce', async () => {
+      it('should revert if not initialized by a valid nonce', async () => {
         const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
         await assertRevert(
           registry.methods[CREATE_ENTRY](
             registry.address, digest, hashFunction, size, -1, "0x0", "0x0", false, { from: accounts[0] }
+          )
+        );
+      });
+
+      it('should revert if a non-deployer adds an entry before initialization', async () => {
+        const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
+        const dappCat = web3.utils.soliditySha3('my-dank-dapp');
+
+        await assertRevert(
+          registry.methods[UPDATE_ENTRY](
+            registry.address, digest, hashFunction, size, dappCat, { from: accounts[1] }
           )
         );
       });
