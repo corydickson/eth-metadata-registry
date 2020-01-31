@@ -17,8 +17,12 @@ pragma experimental ABIEncoderV2;
  * Inspired by: https://github.com/saurfang/ipfs-multihash-on-solidity
 */
 
+
 contract MetadataRegistry {
   address constant ANY_ADDRESS = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF;
+
+  // The hash of the string calculated by keccak256('deployer')
+  bytes32 constant DEPLOYER_CATEGORY = 0xdbe2b933bb7d57444cdba9c71b5ceb79b60dc455ad691d856e6e4025cf542caa;
 
   struct Entry {
     bool selfAttested;
@@ -28,8 +32,8 @@ contract MetadataRegistry {
     uint8 size;
   }
 
-  mapping (address => Entry) private entries;
-  mapping (address => uint) private versions;
+  mapping (address => mapping (bytes32 => Entry)) private entries;
+  mapping (address => mapping (bytes32 => uint)) private versions;
 
   event EntrySet (
     address indexed contractAddress,
@@ -49,15 +53,15 @@ contract MetadataRegistry {
     address indexed delegate
   );
 
-  modifier onlyDelegate(address _contract) {
-    require(entries[_contract].delegate != address(0), "Error: delegate cannot be empty");
-    if (entries[_contract].delegate != ANY_ADDRESS)
-      require(msg.sender == entries[_contract].delegate, "Error: msg.sender is not a delegate");
+  modifier onlyDelegate(address _contract, bytes32 _categoryID) {
+    if (entries[_contract][_categoryID].delegate != ANY_ADDRESS && entries[_contract][_categoryID].delegate != address(0x0)) {
+      require(msg.sender == entries[_contract][_categoryID].delegate, "Error: msg.sender is not a delegate");
+    }
     _;
   }
 
   modifier onlyDeployer(address _contract, bool _create2, int _nonce, bytes32 _salt, bytes memory _code) {
-    require(entries[_contract].delegate == address(0), "Error: contract entry has already been initialized");
+    require(entries[_contract][DEPLOYER_CATEGORY].delegate == address(0), "Error: contract entry has already been initialized");
     if (_contract != msg.sender) {
       address _res = address(0);
       if (_create2) {
@@ -82,7 +86,7 @@ contract MetadataRegistry {
    * @param _code initialization bytecode used to the logic in the contract
    * @param _opcode represents which opcode used to calculate the contract address, where create2 = true and create = false
    */
-  function createEntry (
+  function createEntry(
     address _contract,
     bytes32 _digest,
     uint8 _hashFunction,
@@ -95,7 +99,7 @@ contract MetadataRegistry {
   public
   onlyDeployer(_contract, _opcode, _nonce, _salt, _code)
   {
-    _setEntry(_contract, _digest, _hashFunction, _size);
+    _setEntry(_contract, _digest, _hashFunction, _size, DEPLOYER_CATEGORY);
 
     emit EntrySet(
       _contract,
@@ -112,17 +116,19 @@ contract MetadataRegistry {
    * @param _digest hash digest produced by hashing content using hash function
    * @param _hashFunction hashFunction code for the hash function used
    * @param _size length of the digest
+   * @param _categoryID The keccak256 hash of the string representing the category
    */
   function updateEntry (
     address _contract,
     bytes32 _digest,
     uint8 _hashFunction,
-    uint8 _size
+    uint8 _size,
+    bytes32 _categoryID
   )
   public
-  onlyDelegate(_contract)
+  onlyDelegate(_contract, _categoryID)
   {
-    _setEntry(_contract, _digest, _hashFunction, _size);
+    _setEntry(_contract, _digest, _hashFunction, _size, _categoryID);
 
     emit EntrySet(
       _contract,
@@ -136,75 +142,91 @@ contract MetadataRegistry {
   /**
   * @dev deassociate a multihash entry of a contract address if one exists and sender is a delegate(deployer)
   * @param _contract address of the deassociated contract
+  * @param _categoryID The keccak256 hash of the string representing the category
   */
-  function clearEntry(address _contract)
+  function clearEntry(address _contract, bytes32 _categoryID)
   public
-  onlyDelegate(_contract)
+  onlyDelegate(_contract, _categoryID)
   {
-    require(entries[_contract].digest != 0, "Error: missing entry");
-    delete entries[_contract];
+    require(entries[_contract][_categoryID].digest != 0, "Error: missing entry");
+    delete entries[_contract][_categoryID];
 
-    versions[_contract] -= 1;
-    emit EntryDeleted(msg.sender, versions[_contract]);
+    versions[_contract][_categoryID] -= 1;
+    emit EntryDeleted(msg.sender, versions[_contract][_categoryID]);
   }
 
   /**
   * @dev deassociate a multihash entry of a contract address if one exists and sender is a delegate(deployer)
   * @param _contract address of the deassociated contract
+  * @param _categoryID The keccak256 hash of the string representing the category
   */
-  function setDelegate(address _contract, address _delegate)
+  function setDelegate(address _contract, address _delegate, bytes32 _categoryID)
   public
-  onlyDelegate(_contract)
+  onlyDelegate(_contract, _categoryID)
   {
-    require(entries[_contract].delegate != ANY_ADDRESS, "Error: Deployer made all ethereum addresses' delegates");
-    entries[_contract].delegate = _delegate;
+    require(entries[_contract][_categoryID].delegate != ANY_ADDRESS, "Error: Deployer made all ethereum addresses' delegates");
+    entries[_contract][_categoryID].delegate = _delegate;
     emit SetDelegate(_contract, _delegate);
   }
 
   /**
   * @dev retrieve multihash entry associated with an address
   * @param _address address used as key
+  * @param _categoryID The keccak256 hash of the string representing the category
   */
-  function getIPFSMultihash(address _address)
+  function getIPFSMultihash(address _address, bytes32 _categoryID)
   public
   view
   returns(bytes32 digest, uint8 hashFunction, uint8 size)
   {
-    Entry storage entry = entries[_address];
+    Entry storage entry = entries[_address][_categoryID];
     return (entry.digest, entry.hashFunction, entry.size);
   }
 
   /**
   * @dev retrieve delegate address associated with a contract
   * @param _address address used as key
+  * @param _categoryID The keccak256 hash of the string representing the category
   */
-  function getDelegate(address _address)
+  function getDelegate(address _address, bytes32 _categoryID)
   public
   view
   returns(address delegate)
   {
-    Entry storage entry = entries[_address];
+    Entry storage entry = entries[_address][_categoryID];
     return (entry.delegate);
   }
 
   /**
   * @dev retrieve number of versions published for a contract
   * @param _address address used as key
+  * @param _categoryID The keccak256 hash of the string representing the category
   */
-  function getVersion(address _address)
+  function getVersion(address _address, bytes32 _categoryID)
   public
   view
   returns(uint)
   {
-    uint version = versions[_address];
+    uint version = versions[_address][_categoryID];
     return version;
+  }
+
+  /**
+  * @dev Calculates the address generated using the create2 opcode. For testing purposes only...
+  * @return calculated Address
+  */
+  function calculateCreate2Addr(address _origin, bytes32 _salt, bytes memory _code) public pure returns (address) {
+    // Assumes no memory expansion
+    // keccak256( 0xff ++ address ++ salt ++ keccak256(init_code))[12:]
+    return address(keccak256(byte(0xff), _origin, _salt, keccak256(_code)));
   }
 
   function _setEntry(
     address _contract,
     bytes32 _digest,
     uint8 _hashFunction,
-    uint8 _size
+    uint8 _size,
+    bytes32 _categoryID
   )
   private
   {
@@ -218,18 +240,8 @@ contract MetadataRegistry {
       _hashFunction,
       _size
     );
-    entries[_contract] = entry;
-    versions[_contract] += 1;
-  }
-
-  /**
-  * @dev Calculates the address generated using the create2 opcode. For testing purposes only...
-  * @return calculated Address
-  */
-  function calculateCreate2Addr(address _origin, bytes32 _salt, bytes memory _code) public pure returns (address) {
-    // Assumes no memory expansion
-    // keccak256( 0xff ++ address ++ salt ++ keccak256(init_code))[12:]
-    return address(keccak256(byte(0xff), _origin, _salt, keccak256(_code)));
+    entries[_contract][_categoryID] = entry;
+    versions[_contract][_categoryID] += 1;
   }
 
   function addressFrom(address _origin, int _nonce) private pure returns (address) {

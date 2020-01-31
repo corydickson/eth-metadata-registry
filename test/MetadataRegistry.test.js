@@ -11,12 +11,14 @@ const ANY_ADDRESS = '0xffffffffffffffffffffffffffffffffffffffff';
 const DEFAULT_GAS_PRICE = 1e11; // 100 Shannon
 const DEFAULT_SALT = '0x00';
 const DEFAULT_CODE = '0x0';
+const DEFAULT_CATEGORY_STRING= "deployer";
+const DEFAULT_CATEGORY_ID = web3.utils.soliditySha3(DEFAULT_CATEGORY_STRING);
 const INVALID_NONCE = -1;
 
 const CREATE_ENTRY = 'createEntry(address,bytes32,uint8,uint8,int256,bytes32,bytes,bool)';
-const UPDATE_ENTRY = 'updateEntry(address,bytes32,uint8,uint8)';
-const SET_DELEGATE = 'setDelegate(address,address)';
-const CLEAR_ENTRY = 'clearEntry(address)';
+const UPDATE_ENTRY = 'updateEntry(address,bytes32,uint8,uint8,bytes32)';
+const SET_DELEGATE = 'setDelegate(address,address,bytes32)';
+const CLEAR_ENTRY = 'clearEntry(address,bytes32)';
 
 contract('MetadataRegistry', (accounts) => {
   let registry;
@@ -61,16 +63,16 @@ contract('MetadataRegistry', (accounts) => {
     }
   }
 
-  async function getIPFSHash(contractAddr) {
-    return getMultihashFromContractResponse(await registry.getIPFSMultihash(contractAddr));
+  async function getIPFSHash(contractAddr, category = DEFAULT_CATEGORY_ID) {
+    return getMultihashFromContractResponse(await registry.getIPFSMultihash(contractAddr, category));
   }
 
-  async function getDelegate(contractAddr) {
-    return await registry.getDelegate(contractAddr);
+  async function getDelegate(contractAddr, category = DEFAULT_CATEGORY_ID) {
+    return await registry.getDelegate(contractAddr, category);
   }
 
-  async function getVersion(contractAddr) {
-    return new BigNumber(await registry.getVersion(registry.address)).toNumber();
+  async function getVersion(contractAddr, category = DEFAULT_CATEGORY_ID) {
+    return new BigNumber(await registry.getVersion(registry.address, category)).toNumber();
   }
 
   context('> Verify onlyDeployer create2 modifier', () => {
@@ -121,7 +123,7 @@ contract('MetadataRegistry', (accounts) => {
 
         await expectEvent(
           registry.methods[UPDATE_ENTRY](
-            registry.address, digest, hashFunction, size, { from: accounts[0] }
+            registry.address, digest, hashFunction, size, DEFAULT_CATEGORY_ID, { from: accounts[0] }
           ),
           'EntrySet',
         );
@@ -139,9 +141,9 @@ contract('MetadataRegistry', (accounts) => {
       });
 
       it('should get the delegate after setting', async () => {
-        expect(await getDelegate(registry.address)).to.equal(NULL_ADDRESS);
+        expect(await getDelegate(registry.address, DEFAULT_CATEGORY_ID)).to.equal(NULL_ADDRESS);
         await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
-        expect(await getDelegate(registry.address)).to.equal(accounts[0]);
+        expect(await getDelegate(registry.address, DEFAULT_CATEGORY_ID)).to.equal(accounts[0]);
       });
 
       it('should no longer require nonce after first update', async () => {
@@ -151,7 +153,7 @@ contract('MetadataRegistry', (accounts) => {
         const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
 
         await registry.methods[UPDATE_ENTRY](
-          registry.address, digest, hashFunction, size, { from: accounts[0] }
+          registry.address, digest, hashFunction, size, DEFAULT_CATEGORY_ID, { from: accounts[0] }
         );
         expect(await getVersion(registry.address)).to.equal(2);
         expect(await getIPFSHash(registry.address)).to.equal(ipfsHashes[1]);
@@ -159,16 +161,28 @@ contract('MetadataRegistry', (accounts) => {
 
       it('should allow the deployer to set any ethereum address to be a valid delegate', async () => {
         await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
-        await registry.setDelegate(registry.address, ANY_ADDRESS, { from: accounts[0] });
+        await registry.setDelegate(registry.address, ANY_ADDRESS, DEFAULT_CATEGORY_ID, { from: accounts[0] });
 
         const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
 
         await registry.methods[UPDATE_ENTRY](
-          registry.address, digest, hashFunction, size, { from: accounts[1] }
+          registry.address, digest, hashFunction, size, DEFAULT_CATEGORY_ID, { from: accounts[1] }
         );
 
         expect(await getIPFSHash(registry.address)).to.equal(ipfsHashes[1]);
         expect(await getVersion(registry.address)).to.equal(2);
+      });
+
+      it('should allow non-deployers to add an entry on behalf of an account', async () => {
+        const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
+        const dappCat = web3.utils.soliditySha3('my-dank-dapp');
+
+        await registry.methods[UPDATE_ENTRY](
+          registry.address, digest, hashFunction, size, dappCat, { from: accounts[1] }
+        );
+
+        expect(await getIPFSHash(registry.address, dappCat)).to.equal(ipfsHashes[1]);
+        expect(await getVersion(registry.address, dappCat)).to.equal(1);
       });
     });
 
@@ -242,7 +256,7 @@ contract('MetadataRegistry', (accounts) => {
         await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
         expect(await getIPFSHash(registry.address)).to.equal(ipfsHashes[0]);
 
-        await registry.clearEntry(registry.address);
+        await registry.clearEntry(registry.address, DEFAULT_CATEGORY_ID);
         expect(await getIPFSHash(registry.address)).to.be.a('null');
       });
 
@@ -250,7 +264,7 @@ contract('MetadataRegistry', (accounts) => {
         await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
 
         await expectEvent(
-          registry.clearEntry(registry.address),
+          registry.clearEntry(registry.address, DEFAULT_CATEGORY_ID),
           'EntryDeleted',
         );
       });
@@ -259,18 +273,18 @@ contract('MetadataRegistry', (accounts) => {
         await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
         expect(await getVersion(registry.address)).to.equal(1);
 
-        await registry.clearEntry(registry.address);
+        await registry.clearEntry(registry.address, DEFAULT_CATEGORY_ID);
         expect(await getVersion(registry.address)).to.equal(0);
       });
     });
 
     context('when the transaction fails', () => {
       it('should prevent clearing non-existant entry', async () => {
-        await assertRevert(registry.clearEntry(registry.address));
+        await assertRevert(registry.clearEntry(registry.address, DEFAULT_CATEGORY_ID));
       });
 
       it('should prevent clearing a non-contract', async () => {
-        await assertRevert(registry.clearEntry(accounts[1]));
+        await assertRevert(registry.clearEntry(accounts[1], DEFAULT_CATEGORY_ID));
       });
     });
   });
@@ -279,14 +293,14 @@ contract('MetadataRegistry', (accounts) => {
     context('when the transaction succeds', () => {
       it('should get the updated delegate for the entry', async () => {
         await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
-        await registry.setDelegate(registry.address, accounts[1], { from: accounts[0] });
+        await registry.setDelegate(registry.address, accounts[1], DEFAULT_CATEGORY_ID, { from: accounts[0] });
         expect(await getDelegate(registry.address)).to.equal(accounts[1]);
       });
 
       it('should fire event when delegate changes', async () => {
         await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
         await expectEvent(
-          registry.setDelegate(registry.address, accounts[1], { from: accounts[0] }),
+          registry.setDelegate(registry.address, accounts[1], DEFAULT_CATEGORY_ID, { from: accounts[0] }),
           'SetDelegate',
         );
       });
@@ -294,17 +308,17 @@ contract('MetadataRegistry', (accounts) => {
 
     context('when the transaction fails', () => {
       it('should revert if entry does not exist', async () => {
-        await assertRevert(registry.setDelegate(registry.address, accounts[1], { from: accounts[0] }));
+        await assertRevert(registry.setDelegate(registry.address, accounts[1], DEFAULT_CATEGORY_ID, { from: accounts[0] }));
       });
 
       it('should revert if msg.sender is not a delegate', async () => {
-        await assertRevert(registry.setDelegate(registry.address, accounts[1], { from: accounts[2] }));
+        await assertRevert(registry.setDelegate(registry.address, accounts[1], DEFAULT_CATEGORY_ID, { from: accounts[2] }));
       });
 
       it('should allow the deployer to set any ethereum address to be a valid delegate', async () => {
         await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
-        await registry.setDelegate(registry.address, ANY_ADDRESS, { from: accounts[0] });
-        await assertRevert(registry.setDelegate(registry.address, accounts[1], { from: accounts[2] }));
+        await registry.setDelegate(registry.address, ANY_ADDRESS, DEFAULT_CATEGORY_ID, { from: accounts[0] });
+        await assertRevert(registry.setDelegate(registry.address, accounts[1], DEFAULT_CATEGORY_ID, { from: accounts[2] }));
       });
     });
   });
@@ -335,17 +349,17 @@ contract('MetadataRegistry', (accounts) => {
       await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
 
       gasSetEntry = await formatPrice(
-        await calculateGas(accounts[0], UPDATE_ENTRY, [registry.address, digest, hashFunction, size]),
+        await calculateGas(accounts[0], UPDATE_ENTRY, [registry.address, digest, hashFunction, size, DEFAULT_CATEGORY_ID]),
         gasPrice
       );
 
       gasClearEntry = await formatPrice(
-        await calculateGas(accounts[0], CLEAR_ENTRY, [registry.address]),
+        await calculateGas(accounts[0], CLEAR_ENTRY, [registry.address, DEFAULT_CATEGORY_ID]),
         gasPrice
       );
 
       gasSetDelegate = await formatPrice(
-        await calculateGas(accounts[0], SET_DELEGATE, [registry.address, accounts[1]]),
+        await calculateGas(accounts[0], SET_DELEGATE, [registry.address, accounts[1], DEFAULT_CATEGORY_ID]),
         gasPrice
       );
 
