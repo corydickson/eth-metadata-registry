@@ -13,12 +13,15 @@ const DEFAULT_SALT = '0x00';
 const DEFAULT_CODE = '0x0';
 const DEFAULT_CATEGORY_STRING= "deployer";
 const DEFAULT_CATEGORY_ID = web3.utils.soliditySha3(DEFAULT_CATEGORY_STRING);
+const dappCat = web3.utils.soliditySha3('my-dank-dapp');
 const INVALID_NONCE = -1;
 
 const CREATE_ENTRY = 'createEntry(address,bytes32,uint8,uint8,int256,bytes32,bytes,bool)';
 const UPDATE_ENTRY = 'updateEntry(address,bytes32,uint8,uint8,bytes32)';
 const SET_DELEGATE = 'setDelegate(address,address,bytes32)';
 const CLEAR_ENTRY = 'clearEntry(address,bytes32)';
+const ADD_CATEGORY = 'addCategory(address,bytes32)';
+const DELETE_CATEGORY = 'deleteCategory(address,bytes32)';
 
 contract('MetadataRegistry', (accounts) => {
   let registry;
@@ -173,11 +176,11 @@ contract('MetadataRegistry', (accounts) => {
         expect(await getVersion(registry.address)).to.equal(2);
       });
 
-      it('should allow non-deployers to add an entry on behalf of an account once deployer has initialized an entry', async () => {
-        await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
-
+      it('should allow non-deployers to add an entry on behalf of an account once deployer has approved', async () => {
         const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
-        const dappCat = web3.utils.soliditySha3('my-dank-dapp');
+
+        await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
+        await registry.addCategory(registry.address, dappCat, { from: accounts[0] });
 
         await registry.methods[UPDATE_ENTRY](
           registry.address, digest, hashFunction, size, dappCat, { from: accounts[1] }
@@ -252,8 +255,6 @@ contract('MetadataRegistry', (accounts) => {
 
       it('should revert if a non-deployer adds an entry before initialization', async () => {
         const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
-        const dappCat = web3.utils.soliditySha3('my-dank-dapp');
-
         await assertRevert(
           registry.methods[UPDATE_ENTRY](
             registry.address, digest, hashFunction, size, dappCat, { from: accounts[1] }
@@ -302,6 +303,88 @@ contract('MetadataRegistry', (accounts) => {
     });
   });
 
+  context('> addCategory()', () => {
+    context('when the transaction succeds', () => {
+      it('should add set new category hash to true and allow a user to update', async () => {
+        const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
+
+        await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
+        await expectEvent(
+          registry.addCategory(registry.address, dappCat, { from: accounts[0] }),
+          'CategoryAdded',
+        );
+        expect(await registry.getCategoryStatus(registry.address, dappCat)).to.be.true;
+      });
+    });
+
+    context('when the transaction fails', () => {
+      it('should revert if the category is null byteaddress', async () => {
+        await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
+        await assertRevert(
+          registry.addCategory(registry.address, NULL_ADDRESS, { from: accounts[0] })
+        );
+      });
+
+      it('should revert if the category is null byteaddress', async () => {
+        await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
+        await assertRevert(
+          registry.addCategory(registry.address, NULL_ADDRESS, { from: accounts[0] })
+        );
+      });
+
+      it('should revert if you attempt to re-add deployer category', async () => {
+        await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
+        await assertRevert(
+          registry.addCategory(registry.address, DEFAULT_CATEGORY_ID, { from: accounts[0] })
+        );
+      });
+
+      it('should revert if you attempt to add category before initialization', async () => {
+        await assertRevert(
+          registry.addCategory(registry.address, dappCat, { from: accounts[0] })
+        );
+      });
+
+      it('should revert if the msg.sender is not the deployer', async () => {
+        await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
+        await assertRevert(
+          registry.addCategory(registry.address, dappCat, { from: accounts[1] })
+        );
+      });
+    });
+  });
+
+  context('> deleteCategory()', () => {
+    context('when the transaction succeds', () => {
+      it('should remove entry for a given category and set the status to false', async () => {
+        await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
+        await expectEvent(
+          registry.deleteCategory(registry.address, DEFAULT_CATEGORY_ID, { from: accounts[0] }),
+          'CategoryDeleted',
+        );
+        expect(await registry.getCategoryStatus(registry.address, DEFAULT_CATEGORY_ID)).to.be.false;
+        expect(await getVersion(registry.address)).to.equal(0);
+        expect(await getIPFSHash(registry.address)).to.be.a('null');
+      });
+    });
+
+    context('when the transaction fails', () => {
+      it('should revert if the category does not exist', async () => {
+        await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
+        await assertRevert(
+          registry.deleteCategory(registry.address, dappCat, { from: accounts[0] })
+        );
+      });
+
+      it('should revert if the msg.sender is not a delegate', async () => {
+        await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
+        await assertRevert(
+          registry.deleteCategory(registry.address, dappCat, { from: accounts[1] })
+        );
+      });
+    });
+  });
+
   context('> setDelegate()', () => {
     context('when the transaction succeds', () => {
       it('should get the updated delegate for the entry', async () => {
@@ -338,7 +421,7 @@ contract('MetadataRegistry', (accounts) => {
 
   context('Estimate gas cost:', () => {
     it('should calculate the gas', async () => {
-      let gasCreateEntry, gasCreate2Generation, gasSetEntry, gasClearEntry, gasSetDelegate;
+      let gasCreateEntry, gasCreate2Generation, gasSetEntry, gasClearEntry, gasSetDelegate, gasAddCategory, gasDeleteCategory;
       const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[0]);
       const nonce = await web3.eth.getTransactionCount(accounts[0]) - 1;
       const gasPrice = await getGasPrice();
@@ -376,11 +459,24 @@ contract('MetadataRegistry', (accounts) => {
         gasPrice
       );
 
+      gasAddCategory = await formatPrice(
+        await calculateGas(accounts[0], ADD_CATEGORY, [registry.address, dappCat]),
+        gasPrice
+      );
+
+      gasDeleteCategory = await formatPrice(
+        await calculateGas(accounts[0], DELETE_CATEGORY, [registry.address, DEFAULT_CATEGORY_ID]),
+        gasPrice
+      );
+
       // assert gas has been calculated
       expect(gasCreateEntry).to.not.equal(undefined);
+      expect(gasCreate2Generation).to.not.equal(undefined);
       expect(gasSetEntry).to.not.equal(undefined);
       expect(gasSetDelegate).to.not.equal(undefined);
       expect(gasClearEntry).to.not.equal(undefined);
+      expect(gasAddCategory).to.not.equal(undefined);
+      expect(gasDeleteCategory).to.not.equal(undefined);
 
       console.log("         Gas price @ " + gasPrice);
       console.log("         Initializing with createEntry and nonce:");
@@ -398,6 +494,12 @@ contract('MetadataRegistry', (accounts) => {
       console.log("         Calculate create2 address:");
       console.log("             " + gasCreate2Generation.inWei + " wei");
       console.log("             " + gasCreate2Generation.inEth + " ether");
+      console.log("         Add a new category:");
+      console.log("             " + gasAddCategory.inWei + " wei");
+      console.log("             " + gasAddCategory.inEth + " ether");
+      console.log("         Remove an existing category:");
+      console.log("             " + gasDeleteCategory.inWei + " wei");
+      console.log("             " + gasDeleteCategory.inEth + " ether");
     });
   })
 });

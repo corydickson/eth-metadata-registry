@@ -19,10 +19,9 @@ pragma experimental ABIEncoderV2;
 
 
 contract MetadataRegistry {
-  address constant ANY_ADDRESS = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF;
-
   // The hash of the string calculated by keccak256('deployer')
   bytes32 constant DEPLOYER_CATEGORY = 0xdbe2b933bb7d57444cdba9c71b5ceb79b60dc455ad691d856e6e4025cf542caa;
+  address constant ANY_ADDRESS = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF;
 
   struct Entry {
     bool selfAttested;
@@ -34,6 +33,8 @@ contract MetadataRegistry {
 
   mapping (address => mapping (bytes32 => Entry)) private entries;
   mapping (address => mapping (bytes32 => uint)) private versions;
+  mapping (address => mapping(bytes32 => bool)) private approvedCategories;
+  mapping (address => address) private deployers;
 
   event EntrySet (
     address indexed contractAddress,
@@ -51,6 +52,17 @@ contract MetadataRegistry {
   event SetDelegate (
     address indexed contractAddress,
     address indexed delegate
+  );
+
+  event CategoryAdded (
+    address indexed contractAddress,
+    bytes32 indexed category,
+    address delegate
+  );
+
+  event CategoryDeleted (
+    address indexed contractAddress,
+    bytes32 indexed category
   );
 
   modifier onlyDelegate(address _contract, bytes32 _categoryID) {
@@ -71,6 +83,7 @@ contract MetadataRegistry {
         _res = addressFrom(msg.sender, _nonce);
       }
       require(_res == _contract, "Error: msg.sender must be the deployment key");
+      deployers[_contract] = msg.sender;
     }
     _;
   }
@@ -111,7 +124,7 @@ contract MetadataRegistry {
   }
 
   /**
-   * @dev associate a multihash with a contract if sender has delegate permissions
+   * @dev Update an associated multihash with a contract if sender has delegate permissions
    * @param _contract address of the associated contract
    * @param _digest hash digest produced by hashing content using hash function
    * @param _hashFunction hashFunction code for the hash function used
@@ -128,7 +141,7 @@ contract MetadataRegistry {
   public
   onlyDelegate(_contract, _categoryID)
   {
-    require(versions[_contract][DEPLOYER_CATEGORY] > 0, "Error: deployer must have set the default entry");
+    require(approvedCategories[_contract][_categoryID], "Error: deployer must consent to category update");
     _setEntry(_contract, _digest, _hashFunction, _size, _categoryID);
 
     emit EntrySet(
@@ -141,7 +154,7 @@ contract MetadataRegistry {
   }
 
   /**
-  * @dev deassociate a multihash entry of a contract address if one exists and sender is a delegate(deployer)
+  * @dev Deassociate a multihash entry of a contract address if one exists and sender is a delegate(deployer)
   * @param _contract address of the deassociated contract
   * @param _categoryID The keccak256 hash of the string representing the category
   */
@@ -157,7 +170,7 @@ contract MetadataRegistry {
   }
 
   /**
-  * @dev deassociate a multihash entry of a contract address if one exists and sender is a delegate(deployer)
+  * @dev Deassociate a multihash entry of a contract address if one exists and sender is a delegate(or original deployer)
   * @param _contract address of the deassociated contract
   * @param _categoryID The keccak256 hash of the string representing the category
   */
@@ -171,8 +184,53 @@ contract MetadataRegistry {
   }
 
   /**
-  * @dev retrieve multihash entry associated with an address
-  * @param _address address used as key
+  * @dev Deployer can approve a category hash for a particular contract
+  * @param _contract Address of the contract used in the registry
+  * @param _categoryID The keccak256 hash of the string representing the category
+  */
+  function addCategory(address _contract, bytes32 _categoryID)
+  public
+  {
+    require(deployers[_contract] == msg.sender, "Error: deployment key not set");
+    require(_categoryID != DEPLOYER_CATEGORY, "Error: default category already initialized");
+    require(_categoryID != bytes32(0), "Error: valid category hash must not be zero");
+    approvedCategories[_contract][_categoryID] = true;
+
+    emit CategoryAdded(_contract, _categoryID, msg.sender);
+  }
+
+  /**
+  * @dev Deletes a category as well as the corresponding entry
+  * @param _contract Address of the contract used in the registry
+  * @param _categoryID The keccak256 hash of the string representing the category
+  */
+  function deleteCategory(address _contract, bytes32 _categoryID)
+  public
+  onlyDelegate(_contract, _categoryID)
+  {
+    require(approvedCategories[_contract][_categoryID], "Error: provided category must exist");
+    approvedCategories[_contract][_categoryID] = false;
+    clearEntry(_contract, _categoryID);
+
+    emit CategoryDeleted(_contract, _categoryID);
+  }
+
+  /**
+  * @dev Gets the status of valid categories for a particular contract
+  * @param _contract Address of the contract used in the registry
+  * @param _categoryID The keccak256 hash of the string representing the category
+  */
+  function getCategoryStatus(address _contract, bytes32 _categoryID)
+  public
+  view
+  returns(bool)
+  {
+    return approvedCategories[_contract][_categoryID];
+  }
+
+  /**
+  * @dev Retrieve multihash entry associated with an address
+  * @param _address Contract address used in the registry
   * @param _categoryID The keccak256 hash of the string representing the category
   */
   function getIPFSMultihash(address _address, bytes32 _categoryID)
@@ -185,7 +243,7 @@ contract MetadataRegistry {
   }
 
   /**
-  * @dev retrieve delegate address associated with a contract
+  * @dev Retrieve delegate address associated with a contract
   * @param _address address used as key
   * @param _categoryID The keccak256 hash of the string representing the category
   */
@@ -199,7 +257,7 @@ contract MetadataRegistry {
   }
 
   /**
-  * @dev retrieve number of versions published for a contract
+  * @dev Retrieve number of versions published for a contract
   * @param _address address used as key
   * @param _categoryID The keccak256 hash of the string representing the category
   */
@@ -210,6 +268,18 @@ contract MetadataRegistry {
   {
     uint version = versions[_address][_categoryID];
     return version;
+  }
+
+  /**
+  * @dev Retrieves the address of the deployment key for a particular contract in the registry
+  * @param _contract address of the contract with an entry in the registry
+  */
+  function getRegisteredDeployer(address _contract)
+  public
+  view
+  returns(address)
+  {
+    return deployers[_contract];
   }
 
   /**
@@ -252,6 +322,7 @@ contract MetadataRegistry {
     );
     entries[_contract][_categoryID] = entry;
     versions[_contract][_categoryID] += 1;
+    approvedCategories[_contract][_categoryID] = true;
   }
 
   function addressFrom(address _origin, int _nonce) private pure returns (address) {
