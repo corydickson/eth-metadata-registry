@@ -1,6 +1,6 @@
 specVersion: 0.0.2
 schema:
-  file: ./schema.graphql
+  file: ./subgraph/schema.graphql
 dataSources:
   - kind: ethereum/contract
     name: Contract
@@ -20,7 +20,7 @@ dataSources:
         - name: Contract
           file: ./abis/Contract.json
       eventHandlers:
-        - event: EntrySet(indexed address,indexed address,bytes32,uint8,uint8,bool,uint256)
+        - event: EntrySet(indexed address,indexed address,bytes32,uint8,uint8)
           handler: handleEntrySet
         - event: EntryDeleted(indexed address,uint256)
           handler: handleEntryDeleted
