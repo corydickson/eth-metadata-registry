@@ -290,6 +290,18 @@ contract('MetadataRegistry', (accounts) => {
         await registry.clearEntry(registry.address, DEFAULT_CATEGORY_ID);
         expect(await getVersion(registry.address)).to.equal(0);
       });
+
+      it('should allow EOA to clear data about their own address', async () => {
+        await setInitialIPFSHash(accounts[0], accounts[0], ipfsHashes[0]);
+        const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
+
+        await registry.addCategory(accounts[0], dappCat, { from: accounts[0] });
+        await registry.methods[UPDATE_ENTRY](accounts[0], digest, hashFunction, size, dappCat, { from: accounts[0] });
+
+        await registry.clearEntry(accounts[0], dappCat);
+        expect(await getVersion(accounts[0], dappCat)).to.equal(0);
+        expect(await getIPFSHash(accounts[0], dappCat)).to.be.a('null');
+      });
     });
 
     context('when the transaction fails', () => {
@@ -365,6 +377,34 @@ contract('MetadataRegistry', (accounts) => {
         expect(await registry.getCategoryStatus(registry.address, DEFAULT_CATEGORY_ID)).to.be.false;
         expect(await getVersion(registry.address)).to.equal(0);
         expect(await getIPFSHash(registry.address)).to.be.a('null');
+      });
+
+      it('should allow EOA to remove entries about their own address', async () => {
+        await setInitialIPFSHash(accounts[0], accounts[0], ipfsHashes[0]);
+        const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
+
+        await registry.addCategory(accounts[0], dappCat, { from: accounts[0] });
+        await registry.methods[UPDATE_ENTRY](accounts[0], digest, hashFunction, size, dappCat, { from: accounts[0] });
+
+        await registry.deleteCategory(accounts[0], dappCat, { from: accounts[0] });
+        expect(await registry.getCategoryStatus(accounts[0], dappCat)).to.be.false;
+        expect(await getVersion(accounts[0], dappCat)).to.equal(0);
+        expect(await getIPFSHash(accounts[0], dappCat)).to.be.a('null');
+      });
+
+      it('should allow EOA to remove entries about their own address even when the delegate changes', async () => {
+        await setInitialIPFSHash(accounts[0], accounts[0], ipfsHashes[0]);
+        const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
+
+        await registry.addCategory(accounts[0], dappCat, { from: accounts[0] });
+        await registry.methods[UPDATE_ENTRY](accounts[0], digest, hashFunction, size, dappCat, { from: accounts[0] });
+
+        await registry.setDelegate(accounts[0], accounts[1], dappCat, {from: accounts[0]});
+
+        await registry.deleteCategory(accounts[0], dappCat, { from: accounts[0] });
+        expect(await registry.getCategoryStatus(accounts[0], dappCat)).to.be.false;
+        expect(await getVersion(accounts[0], dappCat)).to.equal(0);
+        expect(await getIPFSHash(accounts[0], dappCat)).to.be.a('null');
       });
     });
 
