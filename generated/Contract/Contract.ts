@@ -47,14 +47,6 @@ export class EntrySet__Params {
   get size(): i32 {
     return this._event.parameters[4].value.toI32();
   }
-
-  get selfAttested(): boolean {
-    return this._event.parameters[5].value.toBoolean();
-  }
-
-  get latest(): BigInt {
-    return this._event.parameters[6].value.toBigInt();
-  }
 }
 
 export class EntryDeleted extends EthereumEvent {
@@ -101,6 +93,54 @@ export class SetDelegate__Params {
   }
 }
 
+export class CategoryAdded extends EthereumEvent {
+  get params(): CategoryAdded__Params {
+    return new CategoryAdded__Params(this);
+  }
+}
+
+export class CategoryAdded__Params {
+  _event: CategoryAdded;
+
+  constructor(event: CategoryAdded) {
+    this._event = event;
+  }
+
+  get contractAddress(): Address {
+    return this._event.parameters[0].value.toAddress();
+  }
+
+  get category(): Bytes {
+    return this._event.parameters[1].value.toBytes();
+  }
+
+  get delegate(): Address {
+    return this._event.parameters[2].value.toAddress();
+  }
+}
+
+export class CategoryDeleted extends EthereumEvent {
+  get params(): CategoryDeleted__Params {
+    return new CategoryDeleted__Params(this);
+  }
+}
+
+export class CategoryDeleted__Params {
+  _event: CategoryDeleted;
+
+  constructor(event: CategoryDeleted) {
+    this._event = event;
+  }
+
+  get contractAddress(): Address {
+    return this._event.parameters[0].value.toAddress();
+  }
+
+  get category(): Bytes {
+    return this._event.parameters[1].value.toBytes();
+  }
+}
+
 export class Contract__getIPFSMultihashResult {
   value0: Bytes;
   value1: i32;
@@ -126,9 +166,58 @@ export class Contract extends SmartContract {
     return new Contract("Contract", address);
   }
 
-  getIPFSMultihash(_address: Address): Contract__getIPFSMultihashResult {
+  getCategoryStatus(_contract: Address, _categoryID: Bytes): boolean {
+    let result = super.call("getCategoryStatus", [
+      EthereumValue.fromAddress(_contract),
+      EthereumValue.fromFixedBytes(_categoryID)
+    ]);
+
+    return result[0].toBoolean();
+  }
+
+  try_getCategoryStatus(
+    _contract: Address,
+    _categoryID: Bytes
+  ): CallResult<boolean> {
+    let result = super.tryCall("getCategoryStatus", [
+      EthereumValue.fromAddress(_contract),
+      EthereumValue.fromFixedBytes(_categoryID)
+    ]);
+    if (result.reverted) {
+      return new CallResult();
+    }
+    let value = result.value;
+    return CallResult.fromValue(value[0].toBoolean());
+  }
+
+  getDelegate(_address: Address, _categoryID: Bytes): Address {
+    let result = super.call("getDelegate", [
+      EthereumValue.fromAddress(_address),
+      EthereumValue.fromFixedBytes(_categoryID)
+    ]);
+
+    return result[0].toAddress();
+  }
+
+  try_getDelegate(_address: Address, _categoryID: Bytes): CallResult<Address> {
+    let result = super.tryCall("getDelegate", [
+      EthereumValue.fromAddress(_address),
+      EthereumValue.fromFixedBytes(_categoryID)
+    ]);
+    if (result.reverted) {
+      return new CallResult();
+    }
+    let value = result.value;
+    return CallResult.fromValue(value[0].toAddress());
+  }
+
+  getIPFSMultihash(
+    _address: Address,
+    _categoryID: Bytes
+  ): Contract__getIPFSMultihashResult {
     let result = super.call("getIPFSMultihash", [
-      EthereumValue.fromAddress(_address)
+      EthereumValue.fromAddress(_address),
+      EthereumValue.fromFixedBytes(_categoryID)
     ]);
 
     return new Contract__getIPFSMultihashResult(
@@ -139,10 +228,12 @@ export class Contract extends SmartContract {
   }
 
   try_getIPFSMultihash(
-    _address: Address
+    _address: Address,
+    _categoryID: Bytes
   ): CallResult<Contract__getIPFSMultihashResult> {
     let result = super.tryCall("getIPFSMultihash", [
-      EthereumValue.fromAddress(_address)
+      EthereumValue.fromAddress(_address),
+      EthereumValue.fromFixedBytes(_categoryID)
     ]);
     if (result.reverted) {
       return new CallResult();
@@ -157,17 +248,25 @@ export class Contract extends SmartContract {
     );
   }
 
-  getDelegate(_address: Address): Address {
-    let result = super.call("getDelegate", [
-      EthereumValue.fromAddress(_address)
+  calculateCreate2Addr(_origin: Address, _salt: Bytes, _code: Bytes): Address {
+    let result = super.call("calculateCreate2Addr", [
+      EthereumValue.fromAddress(_origin),
+      EthereumValue.fromFixedBytes(_salt),
+      EthereumValue.fromBytes(_code)
     ]);
 
     return result[0].toAddress();
   }
 
-  try_getDelegate(_address: Address): CallResult<Address> {
-    let result = super.tryCall("getDelegate", [
-      EthereumValue.fromAddress(_address)
+  try_calculateCreate2Addr(
+    _origin: Address,
+    _salt: Bytes,
+    _code: Bytes
+  ): CallResult<Address> {
+    let result = super.tryCall("calculateCreate2Addr", [
+      EthereumValue.fromAddress(_origin),
+      EthereumValue.fromFixedBytes(_salt),
+      EthereumValue.fromBytes(_code)
     ]);
     if (result.reverted) {
       return new CallResult();
@@ -176,23 +275,162 @@ export class Contract extends SmartContract {
     return CallResult.fromValue(value[0].toAddress());
   }
 
-  getVersion(_address: Address): BigInt {
+  getVersion(_address: Address, _categoryID: Bytes): BigInt {
     let result = super.call("getVersion", [
-      EthereumValue.fromAddress(_address)
+      EthereumValue.fromAddress(_address),
+      EthereumValue.fromFixedBytes(_categoryID)
     ]);
 
     return result[0].toBigInt();
   }
 
-  try_getVersion(_address: Address): CallResult<BigInt> {
+  try_getVersion(_address: Address, _categoryID: Bytes): CallResult<BigInt> {
     let result = super.tryCall("getVersion", [
-      EthereumValue.fromAddress(_address)
+      EthereumValue.fromAddress(_address),
+      EthereumValue.fromFixedBytes(_categoryID)
     ]);
     if (result.reverted) {
       return new CallResult();
     }
     let value = result.value;
     return CallResult.fromValue(value[0].toBigInt());
+  }
+
+  getRegisteredDeployer(_contract: Address): Address {
+    let result = super.call("getRegisteredDeployer", [
+      EthereumValue.fromAddress(_contract)
+    ]);
+
+    return result[0].toAddress();
+  }
+
+  try_getRegisteredDeployer(_contract: Address): CallResult<Address> {
+    let result = super.tryCall("getRegisteredDeployer", [
+      EthereumValue.fromAddress(_contract)
+    ]);
+    if (result.reverted) {
+      return new CallResult();
+    }
+    let value = result.value;
+    return CallResult.fromValue(value[0].toAddress());
+  }
+}
+
+export class SetDelegateCall extends EthereumCall {
+  get inputs(): SetDelegateCall__Inputs {
+    return new SetDelegateCall__Inputs(this);
+  }
+
+  get outputs(): SetDelegateCall__Outputs {
+    return new SetDelegateCall__Outputs(this);
+  }
+}
+
+export class SetDelegateCall__Inputs {
+  _call: SetDelegateCall;
+
+  constructor(call: SetDelegateCall) {
+    this._call = call;
+  }
+
+  get _contract(): Address {
+    return this._call.inputValues[0].value.toAddress();
+  }
+
+  get _delegate(): Address {
+    return this._call.inputValues[1].value.toAddress();
+  }
+
+  get _categoryID(): Bytes {
+    return this._call.inputValues[2].value.toBytes();
+  }
+}
+
+export class SetDelegateCall__Outputs {
+  _call: SetDelegateCall;
+
+  constructor(call: SetDelegateCall) {
+    this._call = call;
+  }
+}
+
+export class UpdateEntryCall extends EthereumCall {
+  get inputs(): UpdateEntryCall__Inputs {
+    return new UpdateEntryCall__Inputs(this);
+  }
+
+  get outputs(): UpdateEntryCall__Outputs {
+    return new UpdateEntryCall__Outputs(this);
+  }
+}
+
+export class UpdateEntryCall__Inputs {
+  _call: UpdateEntryCall;
+
+  constructor(call: UpdateEntryCall) {
+    this._call = call;
+  }
+
+  get _contract(): Address {
+    return this._call.inputValues[0].value.toAddress();
+  }
+
+  get _digest(): Bytes {
+    return this._call.inputValues[1].value.toBytes();
+  }
+
+  get _hashFunction(): i32 {
+    return this._call.inputValues[2].value.toI32();
+  }
+
+  get _size(): i32 {
+    return this._call.inputValues[3].value.toI32();
+  }
+
+  get _categoryID(): Bytes {
+    return this._call.inputValues[4].value.toBytes();
+  }
+}
+
+export class UpdateEntryCall__Outputs {
+  _call: UpdateEntryCall;
+
+  constructor(call: UpdateEntryCall) {
+    this._call = call;
+  }
+}
+
+export class ClearEntryCall extends EthereumCall {
+  get inputs(): ClearEntryCall__Inputs {
+    return new ClearEntryCall__Inputs(this);
+  }
+
+  get outputs(): ClearEntryCall__Outputs {
+    return new ClearEntryCall__Outputs(this);
+  }
+}
+
+export class ClearEntryCall__Inputs {
+  _call: ClearEntryCall;
+
+  constructor(call: ClearEntryCall) {
+    this._call = call;
+  }
+
+  get _contract(): Address {
+    return this._call.inputValues[0].value.toAddress();
+  }
+
+  get _categoryID(): Bytes {
+    return this._call.inputValues[1].value.toBytes();
+  }
+}
+
+export class ClearEntryCall__Outputs {
+  _call: ClearEntryCall;
+
+  constructor(call: ClearEntryCall) {
+    this._call = call;
   }
 }
 
@@ -232,6 +470,18 @@ export class CreateEntryCall__Inputs {
   get _nonce(): BigInt {
     return this._call.inputValues[4].value.toBigInt();
   }
+
+  get _salt(): Bytes {
+    return this._call.inputValues[5].value.toBytes();
+  }
+
+  get _code(): Bytes {
+    return this._call.inputValues[6].value.toBytes();
+  }
+
+  get _opcode(): boolean {
+    return this._call.inputValues[7].value.toBoolean();
+  }
 }
 
 export class CreateEntryCall__Outputs {
@@ -242,20 +492,20 @@ export class CreateEntryCall__Outputs {
   }
 }
 
-export class SetDelegateCall extends EthereumCall {
-  get inputs(): SetDelegateCall__Inputs {
-    return new SetDelegateCall__Inputs(this);
+export class AddCategoryCall extends EthereumCall {
+  get inputs(): AddCategoryCall__Inputs {
+    return new AddCategoryCall__Inputs(this);
   }
 
-  get outputs(): SetDelegateCall__Outputs {
-    return new SetDelegateCall__Outputs(this);
+  get outputs(): AddCategoryCall__Outputs {
+    return new AddCategoryCall__Outputs(this);
   }
 }
 
-export class SetDelegateCall__Inputs {
-  _call: SetDelegateCall;
+export class AddCategoryCall__Inputs {
+  _call: AddCategoryCall;
 
-  constructor(call: SetDelegateCall) {
+  constructor(call: AddCategoryCall) {
     this._call = call;
   }
 
@@ -263,87 +513,49 @@ export class SetDelegateCall__Inputs {
     return this._call.inputValues[0].value.toAddress();
   }
 
-  get _delegate(): Address {
-    return this._call.inputValues[1].value.toAddress();
-  }
-}
-
-export class SetDelegateCall__Outputs {
-  _call: SetDelegateCall;
-
-  constructor(call: SetDelegateCall) {
-    this._call = call;
-  }
-}
-
-export class ClearEntryCall extends EthereumCall {
-  get inputs(): ClearEntryCall__Inputs {
-    return new ClearEntryCall__Inputs(this);
-  }
-
-  get outputs(): ClearEntryCall__Outputs {
-    return new ClearEntryCall__Outputs(this);
-  }
-}
-
-export class ClearEntryCall__Inputs {
-  _call: ClearEntryCall;
-
-  constructor(call: ClearEntryCall) {
-    this._call = call;
-  }
-
-  get _contract(): Address {
-    return this._call.inputValues[0].value.toAddress();
-  }
-}
-
-export class ClearEntryCall__Outputs {
-  _call: ClearEntryCall;
-
-  constructor(call: ClearEntryCall) {
-    this._call = call;
-  }
-}
-
-export class UpdateEntryCall extends EthereumCall {
-  get inputs(): UpdateEntryCall__Inputs {
-    return new UpdateEntryCall__Inputs(this);
-  }
-
-  get outputs(): UpdateEntryCall__Outputs {
-    return new UpdateEntryCall__Outputs(this);
-  }
-}
-
-export class UpdateEntryCall__Inputs {
-  _call: UpdateEntryCall;
-
-  constructor(call: UpdateEntryCall) {
-    this._call = call;
-  }
-
-  get _contract(): Address {
-    return this._call.inputValues[0].value.toAddress();
-  }
-
-  get _digest(): Bytes {
+  get _categoryID(): Bytes {
     return this._call.inputValues[1].value.toBytes();
   }
+}
 
-  get _hashFunction(): i32 {
-    return this._call.inputValues[2].value.toI32();
-  }
+export class AddCategoryCall__Outputs {
+  _call: AddCategoryCall;
 
-  get _size(): i32 {
-    return this._call.inputValues[3].value.toI32();
+  constructor(call: AddCategoryCall) {
+    this._call = call;
   }
 }
 
-export class UpdateEntryCall__Outputs {
-  _call: UpdateEntryCall;
+export class DeleteCategoryCall extends EthereumCall {
+  get inputs(): DeleteCategoryCall__Inputs {
+    return new DeleteCategoryCall__Inputs(this);
+  }
 
-  constructor(call: UpdateEntryCall) {
+  get outputs(): DeleteCategoryCall__Outputs {
+    return new DeleteCategoryCall__Outputs(this);
+  }
+}
+
+export class DeleteCategoryCall__Inputs {
+  _call: DeleteCategoryCall;
+
+  constructor(call: DeleteCategoryCall) {
+    this._call = call;
+  }
+
+  get _contract(): Address {
+    return this._call.inputValues[0].value.toAddress();
+  }
+
+  get _categoryID(): Bytes {
+    return this._call.inputValues[1].value.toBytes();
+  }
+}
+
+export class DeleteCategoryCall__Outputs {
+  _call: DeleteCategoryCall;
+
+  constructor(call: DeleteCategoryCall) {
     this._call = call;
   }
 }

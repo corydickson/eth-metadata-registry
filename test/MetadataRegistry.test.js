@@ -20,7 +20,7 @@ const CREATE_ENTRY = 'createEntry(address,bytes32,uint8,uint8,int256,bytes32,byt
 const UPDATE_ENTRY = 'updateEntry(address,bytes32,uint8,uint8,bytes32)';
 const SET_DELEGATE = 'setDelegate(address,address,bytes32)';
 const CLEAR_ENTRY = 'clearEntry(address,bytes32)';
-const ADD_CATEGORY = 'addCategory(address,bytes32)';
+const ADD_CATEGORY = 'addCategory(address,bytes32,address)';
 const DELETE_CATEGORY = 'deleteCategory(address,bytes32)';
 
 contract('MetadataRegistry', (accounts) => {
@@ -180,7 +180,9 @@ contract('MetadataRegistry', (accounts) => {
         const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
 
         await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
-        await registry.addCategory(registry.address, dappCat, { from: accounts[0] });
+        await registry.addCategory(registry.address, dappCat, accounts[1], { from: accounts[0] });
+
+        expect(await registry.getDelegate(registry.address, dappCat)).to.equal(accounts[1]);
 
         await registry.methods[UPDATE_ENTRY](
           registry.address, digest, hashFunction, size, dappCat, { from: accounts[1] }
@@ -295,7 +297,7 @@ contract('MetadataRegistry', (accounts) => {
         await setInitialIPFSHash(accounts[0], accounts[0], ipfsHashes[0]);
         const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
 
-        await registry.addCategory(accounts[0], dappCat, { from: accounts[0] });
+        await registry.addCategory(accounts[0], dappCat, NULL_ADDRESS, { from: accounts[0] });
         await registry.methods[UPDATE_ENTRY](accounts[0], digest, hashFunction, size, dappCat, { from: accounts[0] });
 
         await registry.clearEntry(accounts[0], dappCat);
@@ -322,7 +324,7 @@ contract('MetadataRegistry', (accounts) => {
 
         await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
         await expectEvent(
-          registry.addCategory(registry.address, dappCat, { from: accounts[0] }),
+          registry.addCategory(registry.address, dappCat, NULL_ADDRESS, { from: accounts[0] }),
           'CategoryAdded',
         );
         expect(await registry.getCategoryStatus(registry.address, dappCat)).to.be.true;
@@ -333,34 +335,34 @@ contract('MetadataRegistry', (accounts) => {
       it('should revert if the category is null byteaddress', async () => {
         await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
         await assertRevert(
-          registry.addCategory(registry.address, NULL_ADDRESS, { from: accounts[0] })
+          registry.addCategory(registry.address, NULL_ADDRESS, NULL_ADDRESS, { from: accounts[0] })
         );
       });
 
       it('should revert if the category is null byteaddress', async () => {
         await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
         await assertRevert(
-          registry.addCategory(registry.address, NULL_ADDRESS, { from: accounts[0] })
+          registry.addCategory(registry.address, NULL_ADDRESS, NULL_ADDRESS, { from: accounts[0] })
         );
       });
 
       it('should revert if you attempt to re-add deployer category', async () => {
         await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
         await assertRevert(
-          registry.addCategory(registry.address, DEFAULT_CATEGORY_ID, { from: accounts[0] })
+          registry.addCategory(registry.address, DEFAULT_CATEGORY_ID, NULL_ADDRESS, { from: accounts[0] })
         );
       });
 
       it('should revert if you attempt to add category before initialization', async () => {
         await assertRevert(
-          registry.addCategory(registry.address, dappCat, { from: accounts[0] })
+          registry.addCategory(registry.address, dappCat, accounts[1], { from: accounts[0] })
         );
       });
 
       it('should revert if the msg.sender is not the deployer', async () => {
         await setInitialIPFSHash(registry.address, accounts[0], ipfsHashes[0]);
         await assertRevert(
-          registry.addCategory(registry.address, dappCat, { from: accounts[1] })
+          registry.addCategory(registry.address, dappCat, NULL_ADDRESS, { from: accounts[1] })
         );
       });
     });
@@ -383,7 +385,7 @@ contract('MetadataRegistry', (accounts) => {
         await setInitialIPFSHash(accounts[0], accounts[0], ipfsHashes[0]);
         const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
 
-        await registry.addCategory(accounts[0], dappCat, { from: accounts[0] });
+        await registry.addCategory(accounts[0], dappCat, NULL_ADDRESS, { from: accounts[0] });
         await registry.methods[UPDATE_ENTRY](accounts[0], digest, hashFunction, size, dappCat, { from: accounts[0] });
 
         await registry.deleteCategory(accounts[0], dappCat, { from: accounts[0] });
@@ -396,7 +398,7 @@ contract('MetadataRegistry', (accounts) => {
         await setInitialIPFSHash(accounts[0], accounts[0], ipfsHashes[0]);
         const { digest, hashFunction, size } = getBytes32FromMultihash(ipfsHashes[1]);
 
-        await registry.addCategory(accounts[0], dappCat, { from: accounts[0] });
+        await registry.addCategory(accounts[0], dappCat, NULL_ADDRESS, { from: accounts[0] });
         await registry.methods[UPDATE_ENTRY](accounts[0], digest, hashFunction, size, dappCat, { from: accounts[0] });
 
         await registry.setDelegate(accounts[0], accounts[1], dappCat, {from: accounts[0]});
@@ -500,7 +502,7 @@ contract('MetadataRegistry', (accounts) => {
       );
 
       gasAddCategory = await formatPrice(
-        await calculateGas(accounts[0], ADD_CATEGORY, [registry.address, dappCat]),
+        await calculateGas(accounts[0], ADD_CATEGORY, [registry.address, dappCat, NULL_ADDRESS]),
         gasPrice
       );
 

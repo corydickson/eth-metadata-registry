@@ -66,8 +66,10 @@ contract MetadataRegistry {
   );
 
   modifier onlyDelegate(address _contract, bytes32 _categoryID) {
+    address _delegate = entries[_contract][_categoryID].delegate;
+
     if (msg.sender != _contract) {
-      if (entries[_contract][_categoryID].delegate != ANY_ADDRESS && entries[_contract][_categoryID].delegate != address(0x0)) {
+      if (_delegate != ANY_ADDRESS && _delegate != address(0x0)) {
         require(msg.sender == entries[_contract][_categoryID].delegate, "Error: msg.sender is not a delegate");
       }
     }
@@ -190,13 +192,20 @@ contract MetadataRegistry {
   * @param _contract Address of the contract used in the registry
   * @param _categoryID The keccak256 hash of the string representing the category
   */
-  function addCategory(address _contract, bytes32 _categoryID)
+  function addCategory(address _contract, bytes32 _categoryID, address _initialDelegate)
   public
   {
     require(deployers[_contract] == msg.sender || msg.sender == _contract, "Error: you do not have permission to add a category");
     require(_categoryID != DEPLOYER_CATEGORY, "Error: default category already initialized");
     require(_categoryID != bytes32(0), "Error: valid category hash must not be zero");
+
     approvedCategories[_contract][_categoryID] = true;
+
+    if (_initialDelegate == address(0x0)) {
+      setDelegate(_contract, msg.sender, _categoryID);
+    } else {
+      setDelegate(_contract, _initialDelegate, _categoryID);
+    }
 
     emit CategoryAdded(_contract, _categoryID, msg.sender);
   }
