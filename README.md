@@ -4,6 +4,7 @@
 Just like it sounds! Use your deployment keys to link metadata stored on IPFS to your contracts. Add categories to allow dapps to publish data about your own address or contracts you've deployed.
 
 v0.0.2 Rinkeby: 0x9E9461B6a1A18df1eCe033d66E615d1eF7222113
+
 v0.0.1 Mainnet: 0xa23E8B119A26D36099ee97F0c7dFb8DB20B50D7D (⚠️  use at your own risk)
 
 ## Overview
