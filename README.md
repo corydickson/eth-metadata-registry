@@ -1,10 +1,9 @@
 [![Build Status](https://travis-ci.com/corydickson/eth-metadata-registry.svg?branch=master)](https://travis-ci.com/corydickson/eth-metadata-registry)
 # On-chain IPFS Metadata Registry
 
-Just like it sounds! Use your deployment keys to link metadata stored on IPFS to your contracts. Add categories to allow dapps to publish data about your own address or contracts
-you've deployed.
+Just like it sounds! Use your deployment keys to link metadata stored on IPFS to your contracts. Add categories to allow dapps to publish data about your own address or contracts you've deployed.
 
-v0.0.2 Rinkeby:
+v0.0.2 Rinkeby: 0x9E9461B6a1A18df1eCe033d66E615d1eF7222113
 v0.0.1 Mainnet: 0xa23E8B119A26D36099ee97F0c7dFb8DB20B50D7D (⚠️  use at your own risk)
 
 ## Overview
@@ -35,9 +34,9 @@ Also, both deployers and EOA retain the right to revoke publishing priviliges by
 
 ### Usage Notes
 
-- Use the null address (0x0000000000000000000000000000000000000000) for the initial delegate when calling `addCategory` to set give `msg.sender` permissions for a particular `categoryID`
-- ANY_ADDRESS (0xffffffffffffffffffffffffffffffffffffffff) allows all ethereum addresses to update the IPFS hash for a given entry
-- For `createEntry` a boolean represents which opcode was used to deploy the contract `create2 === true` `create === false`
+- Use null address `0x0000000000000000000000000000000000000000` for the initial delegate when calling `addCategory` to give `msg.sender` permissions for a particular `categoryID`
+- The delegate `0xffffffffffffffffffffffffffffffffffffffff` allows all ethereum addresses to update the IPFS hash for a given entry
+- For `createEntry` a boolean represents which opcode was used to deploy the contract: `create2 === true` && `create === false`
 
 ![Image of UMLDiagram](http://www.plantuml.com/plantuml/png/jP91QiCm44NtEiKi4wXxW61Ce0bqtT9LAK5Olwv1bemaf_ZsLGGU72etXEAL6MQUvtr9Un-a2qEdXQo3TNH0h-q8nwL68mE4c1fKLFI2flN1ZRIZsY6sZoPM5wGznuhxWWTdq8vErkYH5otCU8HfEMqwtpnw60MtlR4bcYIlifohqQQsyHlHarJAFL3RV_fdwR-sL5NCbqNn4T54l2BGyGmJXCBlZUzbCNCzM0EHyMB_woCRUdNRww-Zuql91-S5zmP_IvnAu5hXQmtfSch_IhpyrwNxVReGK6l5l7gz1j-PY4aZsMU6y-RJrFsFSm-ZXax_0000)
 
